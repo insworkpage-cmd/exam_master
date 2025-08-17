@@ -1,0 +1,44 @@
+buildscript {
+    ext {
+        kotlin_version = '1.8.22'
+        agp_version = '8.1.0' // یا اگر مشکل داشت '8.0.2'
+        google_services_version = '4.3.15'
+    }
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        // اگر می خواهید از میرور چین استفاده کنید، اضافه کنید:
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:$agp_version"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "com.google.gms:google-services:$google_services_version"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        // میرور چین، اگر اینترنت اصلی کند یا قطع است:
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+    }
+}
+
+// مسیر خروجی build
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    project.evaluationDependsOn(":app")
+}
+
+// تسک پاکسازی
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
