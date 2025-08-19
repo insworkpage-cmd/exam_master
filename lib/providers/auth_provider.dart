@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   UserModel? _currentUser;
   bool _isLoading = false;
   String? _pendingClassId;
   bool _isGuest = false;
+
   // اضافه کردن فیلد نقش کاربر
   UserRole? _userRole;
 
@@ -36,6 +40,35 @@ class AuthProvider with ChangeNotifier {
       if (user != null) {
         _currentUser = await _authService.getCurrentUser();
         _userRole = _currentUser?.role; // ذخیره نقش کاربر
+
+        // اگر نقش کاربر null بود، از Firestore بخون
+        if (_userRole == null) {
+          try {
+            final userDoc = await _firestore
+                .collection('users')
+                .doc(_currentUser!.uid)
+                .get();
+
+            if (userDoc.exists) {
+              final roleData = userDoc.data()?['role'];
+              _userRole = UserRole.values.firstWhere(
+                (role) => role.name == (roleData ?? 'normaluser'),
+                orElse: () => UserRole.normaluser,
+              );
+
+              // به‌روزرسانی کاربر با نقش جدید
+              _currentUser = _currentUser?.copyWith(role: _userRole);
+            } else {
+              _userRole = UserRole.normaluser;
+              _currentUser = _currentUser?.copyWith(role: _userRole);
+            }
+          } catch (e) {
+            debugPrint('Error reading user role from Firestore: $e');
+            _userRole = UserRole.normaluser;
+            _currentUser = _currentUser?.copyWith(role: _userRole);
+          }
+        }
+
         debugPrint('Auth state changed. User role: $_userRole');
       } else {
         _currentUser = null;
@@ -48,22 +81,59 @@ class AuthProvider with ChangeNotifier {
   Future<void> initialize() async {
     _isLoading = true;
     notifyListeners();
-    _currentUser = await _authService.getCurrentUser();
-    _userRole = _currentUser?.role; // ذخیره نقش کاربر
-    debugPrint('Initialized. User role: $_userRole');
-    _isLoading = false;
-    notifyListeners();
+
+    try {
+      _currentUser = await _authService.getCurrentUser();
+      _userRole = _currentUser?.role; // ذخیره نقش کاربر
+
+      // اگر نقش کاربر null بود، از Firestore بخون
+      if (_userRole == null && _currentUser != null) {
+        try {
+          final userDoc =
+              await _firestore.collection('users').doc(_currentUser!.uid).get();
+
+          if (userDoc.exists) {
+            final roleData = userDoc.data()?['role'];
+            _userRole = UserRole.values.firstWhere(
+              (role) => role.name == (roleData ?? 'normaluser'),
+              orElse: () => UserRole.normaluser,
+            );
+
+            // به‌روزرسانی کاربر با نقش جدید
+            _currentUser = _currentUser?.copyWith(role: _userRole);
+          } else {
+            _userRole = UserRole.normaluser;
+            _currentUser = _currentUser?.copyWith(role: _userRole);
+          }
+        } catch (e) {
+          debugPrint('Error reading user role from Firestore: $e');
+          _userRole = UserRole.normaluser;
+          _currentUser = _currentUser?.copyWith(role: _userRole);
+        }
+      }
+
+      debugPrint('Initialized. User role: $_userRole');
+    } catch (e) {
+      debugPrint('Error initializing auth provider: $e');
+      _userRole = UserRole.normaluser;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   // متد جدید برای به‌روزرسانی نقش کاربر
   Future<void> updateUserRole(UserRole newRole) async {
     if (_currentUser == null) return;
+
     try {
       // به‌روزرسانی نقش در Firestore
       await _authService.updateUserRole(_currentUser!.id, newRole);
+
       // به‌روزرسانی نقش در حالت محلی
       _userRole = newRole;
       _currentUser = _currentUser?.copyWith(role: newRole);
+
       debugPrint('User role updated to: $newRole');
       notifyListeners();
     } catch (e) {
@@ -101,10 +171,38 @@ class AuthProvider with ChangeNotifier {
   Future<void> signIn(String email, String password) async {
     _isLoading = true;
     notifyListeners();
+
     try {
       _currentUser = await _authService.signIn(email, password);
       _userRole = _currentUser?.role; // ذخیره نقش کاربر
-      debugPrint('Signed in. User role: $_userRole'); // ← اصلاح شد
+
+      // اگر نقش کاربر null بود، از Firestore بخون
+      if (_userRole == null) {
+        try {
+          final userDoc =
+              await _firestore.collection('users').doc(_currentUser!.uid).get();
+
+          if (userDoc.exists) {
+            final roleData = userDoc.data()?['role'];
+            _userRole = UserRole.values.firstWhere(
+              (role) => role.name == (roleData ?? 'normaluser'),
+              orElse: () => UserRole.normaluser,
+            );
+
+            // به‌روزرسانی کاربر با نقش جدید
+            _currentUser = _currentUser?.copyWith(role: _userRole);
+          } else {
+            _userRole = UserRole.normaluser;
+            _currentUser = _currentUser?.copyWith(role: _userRole);
+          }
+        } catch (e) {
+          debugPrint('Error reading user role from Firestore: $e');
+          _userRole = UserRole.normaluser;
+          _currentUser = _currentUser?.copyWith(role: _userRole);
+        }
+      }
+
+      debugPrint('Signed in. User role: $_userRole');
     } catch (e) {
       debugPrint('Sign in error: $e');
       rethrow;
@@ -118,6 +216,7 @@ class AuthProvider with ChangeNotifier {
       {UserRole? role}) async {
     _isLoading = true;
     notifyListeners();
+
     try {
       // ثبت‌نام با نقش پیش‌فرض normaluser
       _currentUser = await _authService.register(
@@ -126,8 +225,84 @@ class AuthProvider with ChangeNotifier {
         name,
         role: role ?? UserRole.normaluser, // ← نقش پیش‌فرض
       );
-      _userRole = role ?? UserRole.normaluser; // ← تنظیم نقش محلی
+
+      // صبر کن تا اطلاعات کاربر در Firestore ذخیره بشه
+      await Future.delayed(const Duration(milliseconds: 1500));
+
+      // اطلاعات کاربر را دوباره از Firestore بخون
+      _currentUser = await _authService.getCurrentUser();
+      _userRole = _currentUser?.role;
+
+      // اگر هنوز نقش null بود، به صورت دستی تنظیم کن
+      if (_userRole == null) {
+        _userRole = role ?? UserRole.normaluser;
+        _currentUser = _currentUser?.copyWith(role: _userRole);
+      }
+
+      debugPrint('Registered. User role: $_userRole');
     } catch (e) {
+      debugPrint('Registration error: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // متد جدید برای ورود خودکار پس از ثبت‌نام
+  Future<void> autoSignInAfterRegistration(
+      String email, String password) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // چند بار تلاش کن تا اطلاعات کاربر در Firestore ذخیره بشه
+      for (int i = 0; i < 5; i++) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        try {
+          _currentUser = await _authService.signIn(email, password);
+          _userRole = _currentUser?.role;
+
+          // اگر ورود موفقیت‌آمیز بود، از حلقه خارج شو
+          if (_currentUser != null) {
+            break;
+          }
+        } catch (e) {
+          debugPrint('Attempt $i failed: $e');
+          // اگر آخرین تلاش بود، خطا را پرتاب کن
+          if (i == 4) rethrow;
+        }
+      }
+
+      // اگر نقش کاربر null بود، از Firestore بخون
+      if (_userRole == null) {
+        try {
+          final userDoc =
+              await _firestore.collection('users').doc(_currentUser!.uid).get();
+
+          if (userDoc.exists) {
+            final roleData = userDoc.data()?['role'];
+            _userRole = UserRole.values.firstWhere(
+              (role) => role.name == (roleData ?? 'normaluser'),
+              orElse: () => UserRole.normaluser,
+            );
+
+            // به‌روزرسانی کاربر با نقش جدید
+            _currentUser = _currentUser?.copyWith(role: _userRole);
+          } else {
+            _userRole = UserRole.normaluser;
+            _currentUser = _currentUser?.copyWith(role: _userRole);
+          }
+        } catch (e) {
+          debugPrint('Error reading user role from Firestore: $e');
+          _userRole = UserRole.normaluser;
+          _currentUser = _currentUser?.copyWith(role: _userRole);
+        }
+      }
+
+      debugPrint('Auto sign-in successful. User role: $_userRole');
+    } catch (e) {
+      debugPrint('Auto sign-in error: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -136,11 +311,15 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    await _authService.signOut();
-    _currentUser = null;
-    _userRole = null;
-    _isGuest = false;
-    notifyListeners();
+    try {
+      await _authService.signOut();
+      _currentUser = null;
+      _userRole = null;
+      _isGuest = false;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Sign out error: $e');
+    }
   }
 
   Future<void> setGuestMode() async {
@@ -158,6 +337,11 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> sendPasswordResetEmail(String email) async {
-    await _authService.sendPasswordResetEmail(email);
+    try {
+      await _authService.sendPasswordResetEmail(email);
+    } catch (e) {
+      debugPrint('Error sending password reset email: $e');
+      rethrow;
+    }
   }
 }

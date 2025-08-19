@@ -503,7 +503,7 @@ class _ReportsPageState extends State<ReportsPage>
                         sideTitles: SideTitles(showTitles: false)),
                   ),
                   borderData: FlBorderData(show: false),
-                  gridData: FlGridData(show: false),
+                  gridData: const FlGridData(show: false),
                   barGroups: roleStats.entries.map((entry) {
                     final index = roleStats.keys.toList().indexOf(entry.key);
                     return BarChartGroupData(
@@ -634,7 +634,7 @@ class _ReportsPageState extends State<ReportsPage>
                   ),
                   borderData: FlBorderData(
                       show: false), // ❌ const ندارد و نمی‌توان اضافه کرد
-                  gridData: FlGridData(
+                  gridData: const FlGridData(
                       show: false), // ❌ const ندارد و نمی‌توان اضافه کرد
                   barGroups: [
                     BarChartGroupData(
@@ -714,7 +714,7 @@ class _ReportsPageState extends State<ReportsPage>
               height: 200,
               child: LineChart(
                 LineChartData(
-                  gridData: FlGridData(show: true),
+                  gridData: const FlGridData(show: true),
                   titlesData: FlTitlesData(
                     show: true,
                     bottomTitles: AxisTitles(

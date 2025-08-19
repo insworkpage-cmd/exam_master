@@ -334,7 +334,7 @@ class ModernLoading extends StatelessWidget {
               padding: EdgeInsets.all(size * 0.15), // ✅ هشدار نادیده گرفته شد
               child: CircularProgressIndicator(
                 strokeWidth: size * 0.06,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
               ),
             ),
           ),

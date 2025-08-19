@@ -19,7 +19,26 @@ class _GuestHomePageState extends State<GuestHomePage> {
           builder: (context, themeProvider, child) {
             final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
 
+            // افزودن لاگ برای تشخیص مشکل
+            debugPrint('=== GUEST HOME DEBUG ===');
+            debugPrint('Is Guest: ${authProvider.isGuest}');
+            debugPrint('User Role: ${authProvider.userRole}');
+            debugPrint('Is Logged In: ${authProvider.isLoggedIn}');
+            debugPrint('====================');
+
             return Scaffold(
+              appBar: AppBar(
+                title: const Text('داشبورد مهمان'),
+                backgroundColor: Colors.amber[700],
+                actions: [
+                  IconButton(
+                    icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
+                    onPressed: () {
+                      themeProvider.toggleTheme();
+                    },
+                  ),
+                ],
+              ),
               body: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -48,7 +67,10 @@ class _GuestHomePageState extends State<GuestHomePage> {
                         _buildLogo(isDarkMode),
                         const SizedBox(height: 48),
                         _buildWelcomeText(isDarkMode),
-                        const SizedBox(height: 64),
+                        const SizedBox(height: 32),
+                        _buildGuestNoticeBox(
+                            isDarkMode), // ← اضافه شدن باکس زرد
+                        const SizedBox(height: 32),
                         _buildActionButtons(context, authProvider, isDarkMode),
                         const SizedBox(height: 32),
                         _buildFeaturesSection(isDarkMode),
@@ -133,6 +155,55 @@ class _GuestHomePageState extends State<GuestHomePage> {
     );
   }
 
+  Widget _buildGuestNoticeBox(bool isDarkMode) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.amber[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.amber[300]!,
+          width: 2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info,
+                color: Colors.amber[800],
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'شما به عنوان مهمان وارد شده‌اید',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber[900],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'برای دسترسی به تمام امکانات پلتفرم، لطفاً وارد حساب کاربری خود شوید یا ثبت‌نام کنید.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.amber[800],
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButtons(
     BuildContext context,
     app_auth.AuthProvider authProvider,
@@ -144,7 +215,10 @@ class _GuestHomePageState extends State<GuestHomePage> {
           context,
           'ورود با ایمیل',
           Icons.email,
-          () => Navigator.pushNamed(context, '/login'),
+          () async {
+            debugPrint('Navigating to login...');
+            Navigator.pushNamed(context, '/login');
+          },
           isDarkMode,
         ),
         const SizedBox(height: 16),
@@ -152,21 +226,27 @@ class _GuestHomePageState extends State<GuestHomePage> {
           context,
           'ثبت‌نام',
           Icons.person_add,
-          () => Navigator.pushNamed(context, '/register'),
+          () async {
+            debugPrint('Navigating to register...');
+            Navigator.pushNamed(context, '/register');
+          },
           isDarkMode,
         ),
         const SizedBox(height: 16),
         _buildActionButton(
           context,
-          'ورود مهمان',
+          'ادامه به عنوان مهمان',
           Icons.person_outline,
           () async {
+            debugPrint('Setting guest mode...');
             await authProvider.setGuestMode();
             if (mounted) {
+              debugPrint('Navigating to guest home...');
               Navigator.pushReplacementNamed(context, '/guest_home');
             }
           },
           isDarkMode,
+          Colors.green, // رنگ متفاوت برای دکمه مهمان
         ),
       ],
     );
@@ -177,21 +257,24 @@ class _GuestHomePageState extends State<GuestHomePage> {
     String title,
     IconData icon,
     VoidCallback onPressed,
-    bool isDarkMode,
-  ) {
+    bool isDarkMode, [
+    Color? buttonColor,
+  ]) {
     return ElevatedButton.icon(
       onPressed: onPressed,
       icon: Icon(icon),
       label: Text(title),
       style: ElevatedButton.styleFrom(
-        backgroundColor: isDarkMode
-            ? Colors.white.withOpacity(0.2)
-            : Colors.black.withOpacity(0.1),
+        backgroundColor: buttonColor ??
+            (isDarkMode
+                ? Colors.white.withOpacity(0.2)
+                : Colors.black.withOpacity(0.1)),
         foregroundColor: isDarkMode ? Colors.white : Colors.black87,
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+        elevation: 4,
       ),
     );
   }

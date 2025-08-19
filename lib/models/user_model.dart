@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ← اضافه کردن import
 import 'user_role.dart';
 
 class UserModel extends Equatable {
@@ -10,7 +11,7 @@ class UserModel extends Equatable {
   final DateTime createdAt;
   final DateTime? lastLogin;
   final bool isActive;
-  final String? phone; // ← اضافه کردن فیلد شماره تلفن
+  final String? phone;
 
   const UserModel({
     required this.id,
@@ -21,7 +22,7 @@ class UserModel extends Equatable {
     required this.createdAt,
     this.lastLogin,
     this.isActive = true,
-    this.phone, // ← اضافه کردن فیلد شماره تلفن
+    this.phone,
   });
 
   UserModel copyWith({
@@ -33,7 +34,7 @@ class UserModel extends Equatable {
     DateTime? createdAt,
     DateTime? lastLogin,
     bool? isActive,
-    String? phone, // ← اضافه کردن فیلد شماره تلفن
+    String? phone,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -44,7 +45,7 @@ class UserModel extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       lastLogin: lastLogin ?? this.lastLogin,
       isActive: isActive ?? this.isActive,
-      phone: phone ?? this.phone, // ← اضافه کردن فیلد شماره تلفن
+      phone: phone ?? this.phone,
     );
   }
 
@@ -52,13 +53,13 @@ class UserModel extends Equatable {
     return {
       'id': id,
       'uid': uid,
-      'role': role.name, // ذخیره نام نقش به صورت رشته
+      'role': role.name,
       'email': email,
       'name': name,
       'createdAt': createdAt.toIso8601String(),
       'lastLogin': lastLogin?.toIso8601String(),
       'isActive': isActive,
-      'phone': phone, // ← اضافه کردن شماره تلفن به مپ
+      'phone': phone,
     };
   }
 
@@ -67,19 +68,33 @@ class UserModel extends Equatable {
       id: map['id'] ?? '',
       uid: map['uid'] ?? '',
       role: UserRole.values.firstWhere(
-        (role) =>
-            role.name ==
-            (map['role'] ?? 'normaluser'), // ← تغییر پیش‌فرض به normaluser
-        orElse: () => UserRole.normaluser, // ← تغییر پیش‌فرض به normaluser
+        (role) => role.name == (map['role'] ?? 'normaluser'),
+        orElse: () => UserRole.normaluser,
       ),
       email: map['email'] ?? '',
       name: map['name'] ?? '',
-      createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
+      // مدیریت صحیح Timestamp
+      createdAt: _parseDateTime(map['createdAt']),
       lastLogin:
-          map['lastLogin'] != null ? DateTime.tryParse(map['lastLogin']) : null,
+          map['lastLogin'] != null ? _parseDateTime(map['lastLogin']) : null,
       isActive: map['isActive'] ?? true,
-      phone: map['phone'], // ← اضافه کردن شماره تلفن از مپ
+      phone: map['phone'],
     );
+  }
+
+  // متد کمکی برای تبدیل Timestamp به DateTime
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+
+    return DateTime.now();
   }
 
   @override
@@ -92,6 +107,6 @@ class UserModel extends Equatable {
         createdAt,
         lastLogin,
         isActive,
-        phone, // ← اضافه کردن شماره تلفن به props
+        phone,
       ];
 }

@@ -24,7 +24,7 @@ void main() {
         (WidgetTester tester) async {
       // استفاده از یک نسخه ساده شده از WelcomeScreen بدون Providerها
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: TestWelcomeScreen(),
         ),
       );
@@ -60,7 +60,7 @@ void main() {
     testWidgets('Test start quiz button navigation',
         (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: TestWelcomeScreen(),
         ),
       );
@@ -84,7 +84,7 @@ void main() {
     testWidgets('Test mobile login button navigation',
         (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: TestWelcomeScreen(),
         ),
       );
@@ -108,7 +108,7 @@ void main() {
     testWidgets('Test guest login button navigation',
         (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: TestWelcomeScreen(),
         ),
       );
@@ -162,7 +162,7 @@ void main() {
 
     testWidgets('Test authentication state', (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: TestAuthScreen(),
         ),
       );

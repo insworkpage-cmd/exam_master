@@ -11,7 +11,7 @@ import 'screens/auth/reset_password_page.dart';
 import 'screens/guest/guest_home_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/instructor/class_list_page.dart';
-import 'providers/auth_provider.dart';
+import 'providers/auth_provider.dart' as app_auth;
 import 'providers/quiz_provider.dart';
 import 'providers/class_provider.dart';
 import 'screens/test/question_management_test_page.dart';
@@ -28,7 +28,7 @@ import 'providers/theme_provider.dart';
 import 'models/user_role.dart';
 import 'widgets/role_based_access.dart';
 import 'models/user_model.dart';
-import 'screens/normal_user_dashboard.dart'; // ← اضافه شد
+import 'screens/normal_user_dashboard.dart';
 
 class StudentDashboard extends StatelessWidget {
   const StudentDashboard({super.key});
@@ -37,19 +37,23 @@ class StudentDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return RoleBasedAccess(
       requiredRole: UserRole.student,
-      child: const Scaffold(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('پنل دانشجو'),
+          centerTitle: true,
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.school, size: 80, color: Colors.green),
-              SizedBox(height: 16),
-              Text(
+              const Icon(Icons.school, size: 80, color: Colors.green),
+              const SizedBox(height: 16),
+              const Text(
                 'پنل دانشجو',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 8),
-              Text('دسترسی دانشجو'),
+              const SizedBox(height: 8),
+              const Text('دسترسی دانشجو'),
             ],
           ),
         ),
@@ -60,24 +64,29 @@ class StudentDashboard extends StatelessWidget {
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
+
   @override
   Widget build(BuildContext context) {
     return RoleBasedAccess(
       requiredRole: UserRole.admin,
-      child: const Scaffold(
-        // ← const حذف شد
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('پنل مدیریت'),
+          centerTitle: true,
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.admin_panel_settings, size: 80, color: Colors.red),
-              SizedBox(height: 16),
-              Text(
+              const Icon(Icons.admin_panel_settings,
+                  size: 80, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
                 'پنل مدیریت کل سیستم',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 8),
-              Text('دسترسی ادمین'),
+              const SizedBox(height: 8),
+              const Text('دسترسی ادمین'),
             ],
           ),
         ),
@@ -88,24 +97,28 @@ class AdminDashboard extends StatelessWidget {
 
 class ModeratorDashboard extends StatelessWidget {
   const ModeratorDashboard({super.key});
+
   @override
   Widget build(BuildContext context) {
     return RoleBasedAccess(
       requiredRole: UserRole.moderator,
-      child: const Scaffold(
-        // ← const حذف شد
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('پنل ناظر'),
+          centerTitle: true,
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.content_paste, size: 80, color: Colors.orange),
-              SizedBox(height: 16),
-              Text(
+              const Icon(Icons.content_paste, size: 80, color: Colors.orange),
+              const SizedBox(height: 16),
+              const Text(
                 'پنل ناظر',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 8),
-              Text('دسترسی ناظر'),
+              const SizedBox(height: 8),
+              const Text('دسترسی ناظر'),
             ],
           ),
         ),
@@ -125,15 +138,18 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('❌ خطا در اتصال به Firebase: $e');
   }
+
   final prefs = await SharedPreferences.getInstance();
   final isGuest = prefs.getBool('isGuest') ?? false;
   if (isGuest) {
     await prefs.remove('isGuest');
   }
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()..initialize()),
+        ChangeNotifierProvider(
+            create: (_) => app_auth.AuthProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => QuizProvider()),
         ChangeNotifierProvider(create: (_) => ClassProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
@@ -145,6 +161,7 @@ Future<void> main() async {
 
 class ExamMasterApp extends StatelessWidget {
   const ExamMasterApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
@@ -169,34 +186,29 @@ class ExamMasterApp extends StatelessWidget {
             '/profile': (_) => const UserProfilePage(),
             '/login': (_) => const EmailLoginPage(),
             '/register': (_) => const RegisterPage(),
-            '/reset-password': (_) => ResetPasswordPage(),
-            '/guest_home': (_) =>
-                const GuestHomePage(), // ← اصلاح: guest-home → guest_home
+            '/reset-password': (_) => ResetPasswordPage(), // ← const حذف شد
+            '/guest_home': (_) => const GuestHomePage(),
             '/quiz': (_) => const QuizPage(),
-            // مسیرهای دانشجو و مدرس
-            '/student_dashboard': (_) =>
-                const StudentDashboard(), // ← اصلاح: student-dashboard → student_dashboard
-            '/instructor_dashboard': (_) =>
-                const InstructorClassListPage(), // ← اصلاح: instructor-classes → instructor_dashboard
+
+            // مسیرهای داشبورها
+            '/student_dashboard': (_) => const StudentDashboard(),
+            '/instructor_dashboard': (_) => const InstructorClassListPage(),
+            '/normaluser_dashboard': (_) => const NormalUserDashboard(),
+            '/moderator_dashboard': (_) => const ModeratorDashboard(),
+            '/admin_dashboard': (_) => const AdminDashboard(),
+
             // مسیرهای مدیریت سوالات
             '/instructor_question_management': (_) =>
-                const QuestionManagementPage(), // ← اصلاح: instructor-question-management
-            '/moderator_question_approval': (_) =>
-                const QuestionApprovalPage(), // ← اصلاح: moderator-question-approval
+                const QuestionManagementPage(),
+            '/moderator_question_approval': (_) => const QuestionApprovalPage(),
+
             // مسیرهای مدیریتی
-            '/admin_dashboard': (_) =>
-                const AdminDashboard(), // ← اصلاح: admin-dashboard → admin_dashboard
-            '/moderator_dashboard': (_) =>
-                const ModeratorDashboard(), // ← اصلاح: moderator-dashboard → moderator_dashboard
             '/admin_panel': (_) => const AdminPanelPage(),
             '/user_management': (_) => const UserManagementPage(),
             '/class_management': (_) => const ClassManagementPage(),
             '/reports': (_) => const ReportsPage(),
             '/system_monitor': (_) => const SystemMonitorPage(),
             '/settings': (_) => const SettingsPage(),
-            // مسیرهای جدید
-            '/normaluser_dashboard': (_) =>
-                const NormalUserDashboard(), // ← اضافه شد
           },
         );
       },
@@ -206,12 +218,14 @@ class ExamMasterApp extends StatelessWidget {
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
   double _opacity = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -235,16 +249,27 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
+    return Consumer<app_auth.AuthProvider>(
       builder: (context, authProvider, child) {
         if (authProvider.isLoading) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (authProvider.isLoggedIn) {
+
+        // لاگ‌های تشخیصی
+        debugPrint('=== WELCOME SCREEN DEBUG ===');
+        debugPrint('Is Loading: ${authProvider.isLoading}');
+        debugPrint('Is Logged In: ${authProvider.isLoggedIn}');
+        debugPrint('Is Guest: ${authProvider.isGuest}');
+        debugPrint('Current User: ${authProvider.currentUser?.uid}');
+        debugPrint('User Role: ${authProvider.userRole}');
+        debugPrint('========================');
+
+        if (authProvider.isLoggedIn && authProvider.currentUser != null) {
           return _DashboardRouter(user: authProvider.currentUser!);
         }
+
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
@@ -309,6 +334,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         icon: Icons.person_outline,
                         label: 'ورود مهمان',
                         onPressed: () async {
+                          debugPrint('Guest login button pressed');
                           await authProvider.setGuestMode();
                           if (!context.mounted) return;
                           Navigator.pushNamed(context, '/guest_home');
@@ -370,21 +396,34 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
 class _DashboardRouter extends StatelessWidget {
   final UserModel user;
+
   const _DashboardRouter({required this.user});
+
   @override
   Widget build(BuildContext context) {
+    debugPrint('=== DASHBOARD ROUTER DEBUG ===');
+    debugPrint('User Role: ${user.role}');
+    debugPrint('User UID: ${user.uid}');
+    debugPrint('============================');
+
     switch (user.role) {
       case UserRole.admin:
+        debugPrint('Routing to AdminDashboard');
         return const AdminDashboard();
-      case UserRole.moderator: // ← اصلاح: contentModerator → moderator
+      case UserRole.moderator:
+        debugPrint('Routing to ModeratorDashboard');
         return const ModeratorDashboard();
       case UserRole.instructor:
+        debugPrint('Routing to InstructorClassListPage');
         return const InstructorClassListPage();
       case UserRole.student:
+        debugPrint('Routing to StudentDashboard');
         return const StudentDashboard();
-      case UserRole.normaluser: // ← اضافه شد
+      case UserRole.normaluser:
+        debugPrint('Routing to NormalUserDashboard');
         return const NormalUserDashboard();
       default:
+        debugPrint('No role matched, using default route');
         return const Scaffold(
           body: Center(child: Text('داشبورد کاربر')),
         );
