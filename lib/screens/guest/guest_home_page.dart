@@ -11,6 +11,29 @@ class GuestHomePage extends StatefulWidget {
 }
 
 class _GuestHomePageState extends State<GuestHomePage> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // افزودن لاگ برای تشخیص مشکل
+    debugPrint('=== GUEST HOME DEBUG ===');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider =
+          Provider.of<app_auth.AuthProvider>(context, listen: false);
+      debugPrint('Is Guest: ${authProvider.isGuest}');
+      debugPrint('User Role: ${authProvider.userRole}');
+      debugPrint('Is Logged In: ${authProvider.isLoggedIn}');
+      debugPrint('====================');
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<app_auth.AuthProvider>(
@@ -19,22 +42,28 @@ class _GuestHomePageState extends State<GuestHomePage> {
           builder: (context, themeProvider, child) {
             final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
 
-            // افزودن لاگ برای تشخیص مشکل
-            debugPrint('=== GUEST HOME DEBUG ===');
-            debugPrint('Is Guest: ${authProvider.isGuest}');
-            debugPrint('User Role: ${authProvider.userRole}');
-            debugPrint('Is Logged In: ${authProvider.isLoggedIn}');
-            debugPrint('====================');
-
             return Scaffold(
               appBar: AppBar(
                 title: const Text('داشبورد مهمان'),
                 backgroundColor: Colors.amber[700],
+                centerTitle: true,
+                // اصلاح: جابجایی دکمه‌ها و افزودن tooltip
+                automaticallyImplyLeading: false,
                 actions: [
+                  // دکمه حالت دارک مود در سمت چپ
                   IconButton(
                     icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
+                    tooltip: isDarkMode ? 'حالت روشن' : 'حالت تاریک',
                     onPressed: () {
                       themeProvider.toggleTheme();
+                    },
+                  ),
+                  // دکمه بازگشت در سمت راست
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'بازگشت',
+                    onPressed: () {
+                      Navigator.of(context).pop();
                     },
                   ),
                 ],
@@ -58,25 +87,32 @@ class _GuestHomePageState extends State<GuestHomePage> {
                   ),
                 ),
                 child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildLogo(isDarkMode),
-                        const SizedBox(height: 48),
-                        _buildWelcomeText(isDarkMode),
-                        const SizedBox(height: 32),
-                        _buildGuestNoticeBox(
-                            isDarkMode), // ← اضافه شدن باکس زرد
-                        const SizedBox(height: 32),
-                        _buildActionButtons(context, authProvider, isDarkMode),
-                        const SizedBox(height: 32),
-                        _buildFeaturesSection(isDarkMode),
-                        const SizedBox(height: 48),
-                        _buildFooter(isDarkMode),
-                      ],
+                  child: Directionality(
+                    // اصلاح: راست‌چین کردن متن‌های فارسی
+                    textDirection: TextDirection.rtl,
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildLogo(isDarkMode),
+                            const SizedBox(height: 32),
+                            _buildWelcomeText(isDarkMode),
+                            const SizedBox(height: 24),
+                            _buildGuestNoticeBox(isDarkMode),
+                            const SizedBox(height: 24),
+                            _buildActionButtons(
+                                context, authProvider, isDarkMode),
+                            const SizedBox(height: 24),
+                            _buildFeaturesSection(isDarkMode),
+                            const SizedBox(height: 32),
+                            _buildFooter(isDarkMode),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -106,14 +142,14 @@ class _GuestHomePageState extends State<GuestHomePage> {
         children: [
           Icon(
             Icons.school,
-            size: 80,
+            size: 64,
             color: isDarkMode ? Colors.white : Colors.black87,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
             'آزمون استخدامی',
             style: TextStyle(
-              fontSize: 28,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
               color: isDarkMode ? Colors.white : Colors.black87,
             ),
@@ -121,7 +157,7 @@ class _GuestHomePageState extends State<GuestHomePage> {
           Text(
             'Master',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               color: isDarkMode ? Colors.white70 : Colors.black54,
             ),
           ),
@@ -136,17 +172,17 @@ class _GuestHomePageState extends State<GuestHomePage> {
         Text(
           'به پلتفرم آزمون استخدامی خوش آمدید!',
           style: TextStyle(
-            fontSize: 24,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: isDarkMode ? Colors.white : Colors.black87,
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Text(
           'با استفاده از این پلتفرم می‌توانید:',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: 14,
             color: isDarkMode ? Colors.white70 : Colors.black54,
           ),
           textAlign: TextAlign.center,
@@ -158,13 +194,13 @@ class _GuestHomePageState extends State<GuestHomePage> {
   Widget _buildGuestNoticeBox(bool isDarkMode) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.amber[100],
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: Colors.amber[300]!,
-          width: 2,
+          width: 1,
         ),
       ),
       child: Column(
@@ -175,14 +211,14 @@ class _GuestHomePageState extends State<GuestHomePage> {
               Icon(
                 Icons.info,
                 color: Colors.amber[800],
-                size: 24,
+                size: 20,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'شما به عنوان مهمان وارد شده‌اید',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.amber[900],
                   ),
@@ -190,13 +226,13 @@ class _GuestHomePageState extends State<GuestHomePage> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'برای دسترسی به تمام امکانات پلتفرم، لطفاً وارد حساب کاربری خود شوید یا ثبت‌نام کنید.',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 12,
               color: Colors.amber[800],
-              height: 1.5,
+              height: 1.3,
             ),
           ),
         ],
@@ -221,7 +257,7 @@ class _GuestHomePageState extends State<GuestHomePage> {
           },
           isDarkMode,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildActionButton(
           context,
           'ثبت‌نام',
@@ -232,7 +268,7 @@ class _GuestHomePageState extends State<GuestHomePage> {
           },
           isDarkMode,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildActionButton(
           context,
           'ادامه به عنوان مهمان',
@@ -246,7 +282,7 @@ class _GuestHomePageState extends State<GuestHomePage> {
             }
           },
           isDarkMode,
-          Colors.green, // رنگ متفاوت برای دکمه مهمان
+          Colors.green,
         ),
       ],
     );
@@ -260,33 +296,36 @@ class _GuestHomePageState extends State<GuestHomePage> {
     bool isDarkMode, [
     Color? buttonColor,
   ]) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon),
-      label: Text(title),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: buttonColor ??
-            (isDarkMode
-                ? Colors.white.withOpacity(0.2)
-                : Colors.black.withOpacity(0.1)),
-        foregroundColor: isDarkMode ? Colors.white : Colors.black87,
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        label: Text(title),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: buttonColor ??
+              (isDarkMode
+                  ? Colors.white.withOpacity(0.2)
+                  : Colors.black.withOpacity(0.1)),
+          foregroundColor: isDarkMode ? Colors.white : Colors.black87,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          elevation: 2,
         ),
-        elevation: 4,
       ),
     );
   }
 
   Widget _buildFeaturesSection(bool isDarkMode) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDarkMode
             ? Colors.white.withOpacity(0.05)
             : Colors.black.withOpacity(0.02),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDarkMode
               ? Colors.white.withOpacity(0.1)
@@ -299,33 +338,33 @@ class _GuestHomePageState extends State<GuestHomePage> {
           Text(
             'ویژگی‌های پلتفرم:',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: isDarkMode ? Colors.white : Colors.black87,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _buildFeatureItem(
             'بانک سوالات جامع',
             Icons.quiz,
             'دسترسی به هزاران سوال آزمون استخدامی',
             isDarkMode,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _buildFeatureItem(
             'آزمون‌های شبیه‌سازی شده',
             Icons.timer,
             'تجربه آزمون واقعی با محدودیت زمانی',
             isDarkMode,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _buildFeatureItem(
             'تحلیل عملکرد',
             Icons.analytics,
             'گزارش تحلیلی از عملکرد شما',
             isDarkMode,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _buildFeatureItem(
             'دسترسی از هر دستگاهی',
             Icons.devices,
@@ -346,20 +385,21 @@ class _GuestHomePageState extends State<GuestHomePage> {
     return Row(
       children: [
         Container(
-          width: 40,
-          height: 40,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             color: isDarkMode
                 ? Colors.white.withOpacity(0.1)
                 : Colors.black.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
             icon,
+            size: 16,
             color: isDarkMode ? Colors.white : Colors.black87,
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,16 +407,16 @@ class _GuestHomePageState extends State<GuestHomePage> {
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: isDarkMode ? Colors.white : Colors.black87,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 description,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 12,
                   color: isDarkMode ? Colors.white70 : Colors.black54,
                 ),
               ),
@@ -391,18 +431,18 @@ class _GuestHomePageState extends State<GuestHomePage> {
     return Column(
       children: [
         Text(
-          'نسخه 1.0.0',
+          'نسخه ۱.۰.۰',
           style: TextStyle(
-            fontSize: 12,
-            color: isDarkMode ? Colors.white54 : Colors.black38,
+            fontSize: 10,
+            color: isDarkMode ? Colors.white38 : Colors.black26,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Text(
-          '© 2024 آزمون استخدامی مستر. تمامی حقوق محفوظ است.',
+          '© ۲۰۲۴ آزمون استخدامی مستر. تمامی حقوق محفوظ است.',
           style: TextStyle(
-            fontSize: 12,
-            color: isDarkMode ? Colors.white54 : Colors.black38,
+            fontSize: 10,
+            color: isDarkMode ? Colors.white38 : Colors.black26,
           ),
           textAlign: TextAlign.center,
         ),

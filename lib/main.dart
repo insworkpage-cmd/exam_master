@@ -299,7 +299,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'آیا آماده‌اید برای موفقیت در آزمون استخدامی؟ همین حالا شروع کنید!',
+                        'آیا برای موفقیت در آزمون استخدامی آماده‌اید؟ همین حالا شروع کنید!',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               fontSize: 16,
