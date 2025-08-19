@@ -8,7 +8,6 @@ class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
-
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   UserModel? _currentUser;
@@ -18,10 +17,14 @@ class AuthService {
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _currentUser != null;
 
+  // اضافه کردن Stream برای تغییرات احراز هویت
+  Stream<User?> authStateChanges() => _auth.authStateChanges();
+
   void initialize() {
     _auth.authStateChanges().listen((user) async {
       if (user != null) {
         _currentUser = await _getUserData(user.uid);
+        Logger.info('Auth state changed. User role: ${_currentUser?.role}');
       } else {
         _currentUser = null;
       }
@@ -41,26 +44,35 @@ class AuthService {
         return await _createUserDocument(user);
       }
       Logger.info('User document found');
-      return UserModel.fromMap(doc.data()!);
+      final userModel = UserModel.fromMap(doc.data()!);
+      Logger.info('Current user role: ${userModel.role}');
+      return userModel;
     } catch (e) {
       Logger.error('Error getting current user: $e');
       return null;
     }
   }
 
-  Future<UserModel> _createUserDocument(User user) async {
+  Future<UserModel> _createUserDocument(User user, {UserRole? role}) async {
     Logger.info('Creating new user document for: ${user.uid}');
+    // تعیین نقش پیش‌فرض
+    UserRole userRole = role ?? UserRole.normaluser;
+    // بررسی ادمین خاص
+    if (user.email == 'insworkpage@gmail.com') {
+      userRole = UserRole.admin;
+    }
     final userModel = UserModel(
-      id: '',
+      id: user.uid,
       uid: user.uid,
-      role: UserRole.registeredUser,
+      role: userRole,
       email: user.email ?? '',
       name: user.displayName ?? '',
       createdAt: DateTime.now(),
     );
     final docRef = _firestore.collection('users').doc(user.uid);
     await docRef.set(userModel.toMap());
-    Logger.info('User document created successfully');
+    Logger.info(
+        'User document created successfully with role: ${userModel.role}');
     final updatedDoc = await docRef.get();
     return UserModel.fromMap(updatedDoc.data()!);
   }
@@ -73,6 +85,7 @@ class AuthService {
         password: password,
       );
       _currentUser = await _getUserData(userCredential.user!.uid);
+      Logger.info('User signed in. Role: ${_currentUser?.role}');
       _isLoading = false;
       return _currentUser;
     } on FirebaseAuthException catch (e) {
@@ -87,7 +100,11 @@ class AuthService {
   }
 
   Future<UserModel?> register(
-      String email, String password, String name) async {
+    String email,
+    String password,
+    String name, {
+    UserRole? role, // ← اضافه کردن پارامتر نقش
+  }) async {
     try {
       _isLoading = true;
       final userCredential = await _auth.createUserWithEmailAndPassword(
@@ -95,7 +112,11 @@ class AuthService {
         password: password,
       );
       await userCredential.user?.updateDisplayName(name);
-      _currentUser = await _createUserDocument(userCredential.user!);
+      // ایجاد سند کاربر با نقش مشخص شده
+      _currentUser = await _createUserDocument(
+        userCredential.user!,
+        role: role ?? UserRole.normaluser, // ← نقش پیش‌فرض normaluser
+      );
       _isLoading = false;
       return _currentUser;
     } on FirebaseAuthException catch (e) {
@@ -116,12 +137,39 @@ class AuthService {
         'role': role.name,
         'updatedAt': DateTime.now().toIso8601String(),
       });
+      // به‌روزرسانی کاربر فعلی اگر همان کاربر باشد
       if (_currentUser?.uid == uid) {
         _currentUser = _currentUser?.copyWith(role: role);
       }
       Logger.info('User role updated successfully');
     } catch (e) {
       Logger.error('Error updating user role: $e');
+      rethrow;
+    }
+  }
+
+  // متد جدید برای به‌روزرسانی اطلاعات کاربر
+  Future<void> updateUser(UserModel user) async {
+    try {
+      Logger.info('Updating user data for: ${user.id}');
+
+      // به‌روزرسانی اطلاعات کاربر در Firestore
+      await _firestore.collection('users').doc(user.id).update(user.toMap());
+
+      // به‌روزرسانی اطلاعات کاربر در Firebase Auth
+      final firebaseUser = _auth.currentUser;
+      if (firebaseUser != null && firebaseUser.uid == user.id) {
+        await firebaseUser.updateDisplayName(user.name);
+      }
+
+      // به‌روزرسانی کاربر فعلی در حالت محلی
+      if (_currentUser?.id == user.id) {
+        _currentUser = user;
+      }
+
+      Logger.info('User data updated successfully');
+    } catch (e) {
+      Logger.error('Error updating user data: $e');
       rethrow;
     }
   }
@@ -135,7 +183,8 @@ class AuthService {
         Logger.warning('No user found for access check');
         return false;
       }
-      final hasAccess = user.role.level >= requiredRole.level;
+      // مقایسه سطح دسترسی بر اساس سطح نقش
+      final hasAccess = user.role.index >= requiredRole.index;
       Logger.info('Access ${hasAccess ? 'granted' : 'denied'} for user: $uid');
       return hasAccess;
     } catch (e) {
@@ -173,9 +222,14 @@ class AuthService {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (!doc.exists) {
+        Logger.warning('User document not found for uid: $uid');
         return null;
       }
-      return UserModel.fromMap(doc.data()!);
+      final data = doc.data()!;
+      Logger.info('User data from Firestore: $data');
+      final userModel = UserModel.fromMap(data);
+      Logger.info('Parsed user role: ${userModel.role}');
+      return userModel;
     } catch (e) {
       Logger.error('Error getting user data: $e');
       return null;

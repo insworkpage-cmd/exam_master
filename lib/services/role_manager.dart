@@ -24,17 +24,16 @@ class RoleManager {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (!doc.exists) {
-        return UserRole.guest;
+        return UserRole.normaluser; // ← تغییر: کاربر جدید normaluser است
       }
-
-      final roleString = doc.data()?['role'] ?? 'guest';
+      final roleString = doc.data()?['role'] ?? 'normaluser'; // ← تغییر پیش‌فرض
       return UserRole.values.firstWhere(
         (role) => role.name == roleString,
-        orElse: () => UserRole.guest,
+        orElse: () => UserRole.normaluser, // ← تغییر پیش‌فرض
       );
     } catch (e) {
       Logger.error('Error getting user role: $e');
-      return UserRole.guest;
+      return UserRole.normaluser; // ← تغییر پیش‌فرض
     }
   }
 
@@ -46,25 +45,23 @@ class RoleManager {
 
       switch (currentRole) {
         case UserRole.guest:
-          newRole = UserRole.registeredUser;
+          newRole = UserRole.normaluser; // ← تغییر: registeredUser → normaluser
           break;
-        case UserRole.registeredUser:
+        case UserRole.normaluser:
           newRole = UserRole.student;
           break;
         case UserRole.student:
           newRole = UserRole.instructor;
           break;
         case UserRole.instructor:
-          newRole = UserRole.contentModerator;
+          newRole = UserRole.moderator; // ← تغییر: contentModerator → moderator
           break;
-        case UserRole.contentModerator:
+        case UserRole.moderator:
           newRole = UserRole.admin;
           break;
         case UserRole.admin:
-          newRole = UserRole.superAdmin;
-          break;
-        case UserRole.superAdmin:
-          throw Exception('User already has the highest role');
+          throw Exception(
+              'User already has the highest role'); // ← حذف superAdmin
       }
 
       await saveUserRole(uid, newRole);
@@ -81,22 +78,19 @@ class RoleManager {
       UserRole newRole;
 
       switch (currentRole) {
-        case UserRole.superAdmin:
-          newRole = UserRole.admin;
-          break;
         case UserRole.admin:
-          newRole = UserRole.contentModerator;
+          newRole = UserRole.moderator; // ← تغییر: contentModerator → moderator
           break;
-        case UserRole.contentModerator:
+        case UserRole.moderator:
           newRole = UserRole.instructor;
           break;
         case UserRole.instructor:
           newRole = UserRole.student;
           break;
         case UserRole.student:
-          newRole = UserRole.registeredUser;
+          newRole = UserRole.normaluser; // ← تغییر: registeredUser → normaluser
           break;
-        case UserRole.registeredUser:
+        case UserRole.normaluser:
           newRole = UserRole.guest;
           break;
         case UserRole.guest:
@@ -117,7 +111,6 @@ class RoleManager {
           .collection('users')
           .where('role', isEqualTo: role.name)
           .get();
-
       return query.docs.map((doc) => UserModel.fromMap(doc.data())).toList();
     } catch (e) {
       Logger.error('Error getting users by role: $e');

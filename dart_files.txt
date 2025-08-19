@@ -3,6 +3,7 @@ E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\main.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\core\question_model.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\models\class_model.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\models\instructor_class_model.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\models\question_stats_model.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\models\student_model.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\models\user_model.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\models\user_role.dart
@@ -10,9 +11,11 @@ E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\models\user_score_
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\providers\auth_provider.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\providers\class_provider.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\providers\quiz_provider.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\providers\role_provider.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\providers\theme_provider.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\admin_dashboard.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\moderator_dashboard.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\normal_user_dashboard.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\admin\admin_panel_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\admin\analytics_dashboard.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\admin\class_management_page.dart

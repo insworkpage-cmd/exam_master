@@ -10,6 +10,7 @@ class UserModel extends Equatable {
   final DateTime createdAt;
   final DateTime? lastLogin;
   final bool isActive;
+  final String? phone; // ← اضافه کردن فیلد شماره تلفن
 
   const UserModel({
     required this.id,
@@ -20,6 +21,7 @@ class UserModel extends Equatable {
     required this.createdAt,
     this.lastLogin,
     this.isActive = true,
+    this.phone, // ← اضافه کردن فیلد شماره تلفن
   });
 
   UserModel copyWith({
@@ -31,6 +33,7 @@ class UserModel extends Equatable {
     DateTime? createdAt,
     DateTime? lastLogin,
     bool? isActive,
+    String? phone, // ← اضافه کردن فیلد شماره تلفن
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -41,6 +44,7 @@ class UserModel extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       lastLogin: lastLogin ?? this.lastLogin,
       isActive: isActive ?? this.isActive,
+      phone: phone ?? this.phone, // ← اضافه کردن فیلد شماره تلفن
     );
   }
 
@@ -48,12 +52,13 @@ class UserModel extends Equatable {
     return {
       'id': id,
       'uid': uid,
-      'role': role.name,
+      'role': role.name, // ذخیره نام نقش به صورت رشته
       'email': email,
       'name': name,
       'createdAt': createdAt.toIso8601String(),
       'lastLogin': lastLogin?.toIso8601String(),
       'isActive': isActive,
+      'phone': phone, // ← اضافه کردن شماره تلفن به مپ
     };
   }
 
@@ -62,8 +67,10 @@ class UserModel extends Equatable {
       id: map['id'] ?? '',
       uid: map['uid'] ?? '',
       role: UserRole.values.firstWhere(
-        (role) => role.name == (map['role'] ?? 'guest'),
-        orElse: () => UserRole.guest,
+        (role) =>
+            role.name ==
+            (map['role'] ?? 'normaluser'), // ← تغییر پیش‌فرض به normaluser
+        orElse: () => UserRole.normaluser, // ← تغییر پیش‌فرض به normaluser
       ),
       email: map['email'] ?? '',
       name: map['name'] ?? '',
@@ -71,11 +78,20 @@ class UserModel extends Equatable {
       lastLogin:
           map['lastLogin'] != null ? DateTime.tryParse(map['lastLogin']) : null,
       isActive: map['isActive'] ?? true,
+      phone: map['phone'], // ← اضافه کردن شماره تلفن از مپ
     );
   }
 
   @override
-  @override
-  List<Object?> get props =>
-      [id, uid, role, email, name, createdAt, lastLogin, isActive];
+  List<Object?> get props => [
+        id,
+        uid,
+        role,
+        email,
+        name,
+        createdAt,
+        lastLogin,
+        isActive,
+        phone, // ← اضافه کردن شماره تلفن به props
+      ];
 }

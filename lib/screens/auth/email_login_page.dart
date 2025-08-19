@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../models/user_role.dart';
 import 'dart:math';
 
 class EmailLoginPage extends StatefulWidget {
   final VoidCallback? onLoginSuccess;
-
   const EmailLoginPage({super.key, this.onLoginSuccess});
 
   @override
@@ -37,16 +37,22 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
+
     final enteredCaptcha = int.tryParse(_captchaController.text.trim());
     final expectedCaptcha = _firstNumber + _secondNumber;
+
     if (enteredCaptcha != expectedCaptcha) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('پاسخ کپچا اشتباه است')),
+        const SnackBar(
+          content: Text('پاسخ کپچا اشتباه است'),
+          backgroundColor: Colors.red,
+        ),
       );
       _generateCaptcha();
       setState(() {});
       return;
     }
+
     setState(() => _isLoading = true);
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -54,20 +60,59 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
         _emailController.text.trim(),
         _passwordController.text,
       );
+
       if (!mounted) return;
+
+      // دریافت نقش کاربر (اصلاح شد)
+      final userRole = authProvider.userRole;
+      debugPrint('User role after login: $userRole');
+
+      // فراخوانی onLoginSuccess اگر وجود داشته باشد
       if (widget.onLoginSuccess != null) {
         widget.onLoginSuccess!();
       } else {
-        Navigator.pushReplacementNamed(context, '/profile');
+        // هدایت بر اساس نقش
+        _navigateToDashboard(userRole);
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در ورود: ${e.toString()}')),
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _navigateToDashboard(UserRole? role) {
+    String route;
+    debugPrint('Navigating based on role: $role');
+
+    switch (role) {
+      case UserRole.admin:
+        route = '/admin_dashboard'; // ← اصلاح مسیر
+        break;
+      case UserRole.moderator:
+        route = '/moderator_dashboard'; // ← اصلاح: contentModerator → moderator
+        break;
+      case UserRole.instructor:
+        route = '/instructor_dashboard'; // ← اصلاح مسیر
+        break;
+      case UserRole.student:
+        route = '/student_dashboard'; // ← اصلاح مسیر
+        break;
+      case UserRole.normaluser:
+        route = '/normaluser_dashboard'; // ← اضافه شد
+        break;
+      default:
+        route = '/guest_home'; // ← اصلاح: profile → guest_home
+    }
+
+    debugPrint('Navigating to route: $route');
+    Navigator.pushReplacementNamed(context, route);
   }
 
   @override
@@ -87,10 +132,22 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                   TextFormField(
                     key: const ValueKey('emailField'),
                     controller: _emailController,
-                    decoration: const InputDecoration(labelText: 'ایمیل'),
+                    decoration: const InputDecoration(
+                      labelText: 'ایمیل',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.email),
+                    ),
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) =>
-                        value!.isEmpty ? 'ایمیل را وارد کنید' : null,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'ایمیل را وارد کنید';
+                      }
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                          .hasMatch(value)) {
+                        return 'ایمیل نامعتبر است';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -99,23 +156,35 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                     obscureText: !_showPassword,
                     decoration: InputDecoration(
                       labelText: 'رمز عبور',
+                      border: const OutlineInputBorder(), // ← اضافه کردن const
+                      prefixIcon: const Icon(Icons.lock), // ← اضافه کردن const
                       suffixIcon: IconButton(
-                        icon: Icon(
-                          _showPassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
+                        icon: _showPassword
+                            ? const Icon(
+                                Icons.visibility_off) // ← اضافه کردن const
+                            : const Icon(
+                                Icons.visibility), // ← اضافه کردن const
                         onPressed: () =>
                             setState(() => _showPassword = !_showPassword),
                       ),
                     ),
-                    validator: (value) =>
-                        value!.length < 6 ? 'حداقل ۶ کاراکتر وارد کنید' : null,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'رمز عبور را وارد کنید';
+                      }
+                      if (value.length < 6) {
+                        return 'رمز عبور باید حداقل ۶ کاراکتر باشد';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Text('🔐 کپچا: $_firstNumber + $_secondNumber = ?'),
+                      Text(
+                        '🔐 کپچا: $_firstNumber + $_secondNumber = ?',
+                        style: const TextStyle(fontSize: 16),
+                      ),
                       const Spacer(),
                       IconButton(
                         icon: const Icon(Icons.refresh),
@@ -130,9 +199,16 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                     key: const ValueKey('captchaField'),
                     controller: _captchaController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'پاسخ کپچا'),
-                    validator: (value) =>
-                        value!.isEmpty ? 'پاسخ کپچا را وارد کنید' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'پاسخ کپچا',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'پاسخ کپچا را وارد کنید';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 24),
                   if (_isLoading)
@@ -140,10 +216,19 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                   else
                     Column(
                       children: [
-                        ElevatedButton(
-                          key: const ValueKey('loginButton'),
-                          onPressed: _login,
-                          child: const Text('ورود'),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            key: const ValueKey('loginButton'),
+                            onPressed: _login,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text(
+                              'ورود',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         TextButton.icon(

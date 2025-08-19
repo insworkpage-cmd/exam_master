@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
+import '../../providers/auth_provider.dart' as app_auth;
+import '../../models/user_role.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -11,17 +14,15 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   final _captchaController = TextEditingController();
-
   final RegExp _emailRegex =
       RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-
   int _firstNumber = 0;
   int _secondNumber = 0;
-
   bool _emailValid = false;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
@@ -32,6 +33,16 @@ class _RegisterPageState extends State<RegisterPage> {
     super.initState();
     _generateCaptcha();
     _emailController.addListener(_validateEmailLive);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    _captchaController.dispose();
+    super.dispose();
   }
 
   void _generateCaptcha() {
@@ -64,13 +75,19 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      final authProvider =
+          Provider.of<app_auth.AuthProvider>(context, listen: false);
+
+      await authProvider.register(
+        _emailController.text.trim(),
+        _passwordController.text,
+        _nameController.text.trim(),
+        role: UserRole.normaluser,
       );
 
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/profile');
+
+      Navigator.pushReplacementNamed(context, '/normaluser_dashboard');
     } on FirebaseAuthException catch (e) {
       String message = 'خطا در ثبت‌نام';
       if (e.code == 'email-already-in-use') {
@@ -80,6 +97,7 @@ class _RegisterPageState extends State<RegisterPage> {
       } else if (e.code == 'weak-password') {
         message = 'رمز باید حداقل ۶ کاراکتر باشد.';
       }
+
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(message)));
@@ -107,6 +125,25 @@ class _RegisterPageState extends State<RegisterPage> {
             key: _formKey,
             child: ListView(
               children: [
+                TextFormField(
+                  key: const ValueKey('nameField'),
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'نام و نام خانوادگی',
+                    hintText: 'نام کامل خود را وارد کنید',
+                  ),
+                  textDirection: TextDirection.rtl,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'نام را وارد کنید';
+                    }
+                    if (value.trim().length < 3) {
+                      return 'نام باید حداقل ۳ کاراکتر باشد';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   key: const ValueKey('emailField'),
                   controller: _emailController,

@@ -1,35 +1,38 @@
-import 'package:exam_master/screens/auth/email_login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:exam_master/screens/auth/email_login_page.dart';
 
 void main() {
   group('EmailLoginPage', () {
-    testWidgets('نمایش فیلدهای ایمیل، رمز، کپچا', (tester) async {
+    testWidgets('نمایش فیلدهای ایمیل، رمز و دکمه‌ها', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: EmailLoginPage()));
-      expect(find.byKey(const ValueKey('emailField')), findsOneWidget);
-      expect(find.byKey(const ValueKey('passwordField')), findsOneWidget);
-      expect(find.byKey(const ValueKey('captchaField')), findsOneWidget);
+
+      expect(find.byType(TextFormField), findsNWidgets(2));
+      expect(find.byType(ElevatedButton), findsOneWidget);
+      expect(find.byType(TextButton), findsOneWidget);
+      expect(find.byType(OutlinedButton), findsOneWidget);
     });
 
     testWidgets('نمایش خطا در صورت خالی بودن ایمیل', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: EmailLoginPage()));
-      await tester.tap(find.byKey(const ValueKey('loginButton')));
+
+      await tester.tap(find.byType(ElevatedButton));
       await tester.pump();
-      expect(find.text('ایمیل را وارد کنید'), findsOneWidget);
+
+      expect(find.text('لطفاً ایمیل را وارد کنید'), findsOneWidget);
     });
 
     testWidgets('نمایش خطا در صورت رمز کوتاه', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: EmailLoginPage()));
 
       await tester.enterText(
-          find.byKey(const ValueKey('emailField')), 'test@example.com');
-      await tester.enterText(
-          find.byKey(const ValueKey('passwordField')), '123');
+          find.byType(TextFormField).first, 'test@example.com');
+      await tester.enterText(find.byType(TextFormField).last, '123');
 
-      await tester.tap(find.byKey(const ValueKey('loginButton')));
+      await tester.tap(find.byType(ElevatedButton));
       await tester.pump();
 
-      expect(find.text('حداقل ۶ کاراکتر وارد کنید'), findsOneWidget);
+      expect(find.text('رمز عبور باید حداقل ۶ کاراکتر باشد'), findsOneWidget);
     });
 
     testWidgets('رفتن به صفحه ثبت‌نام با کلیک دکمه', (tester) async {
@@ -43,7 +46,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const ValueKey('goToRegisterButton')));
+      await tester.tap(find.byType(OutlinedButton));
       await tester.pumpAndSettle();
 
       expect(find.text('Register Page'), findsOneWidget);
@@ -60,7 +63,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const ValueKey('goToResetPasswordButton')));
+      await tester.tap(find.byType(TextButton));
       await tester.pumpAndSettle();
 
       expect(find.text('Reset Page'), findsOneWidget);

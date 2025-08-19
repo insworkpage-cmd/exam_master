@@ -1,13 +1,11 @@
 // lib/models/user_role.dart
-
 enum UserRole {
-  guest,
-  registeredUser,
-  student,
-  instructor,
-  contentModerator,
-  admin,
-  superAdmin,
+  guest, // برای کاربران مهمان (لاگین نکرده)
+  normaluser, // برای کاربران عادی (ثبت‌نام شده)
+  student, // برای دانشجویان (دعوت شده توسط استاد)
+  instructor, // برای اساتید
+  moderator, // برای ناظران
+  admin, // برای ادمین‌ها
 }
 
 extension UserRoleExtension on UserRole {
@@ -15,18 +13,16 @@ extension UserRoleExtension on UserRole {
     switch (this) {
       case UserRole.guest:
         return 'مهمان';
-      case UserRole.registeredUser:
-        return 'کاربر ثبت‌نام شده';
+      case UserRole.normaluser:
+        return 'کاربر عادی';
       case UserRole.student:
         return 'دانشجو';
       case UserRole.instructor:
-        return 'مدرس';
-      case UserRole.contentModerator:
-        return 'ناظر محتوا';
+        return 'استاد';
+      case UserRole.moderator:
+        return 'ناظر';
       case UserRole.admin:
         return 'مدیر';
-      case UserRole.superAdmin:
-        return 'مدیر ارشد';
     }
   }
 
@@ -34,43 +30,36 @@ extension UserRoleExtension on UserRole {
     switch (this) {
       case UserRole.guest:
         return 0;
-      case UserRole.registeredUser:
+      case UserRole.normaluser:
         return 1;
       case UserRole.student:
         return 2;
       case UserRole.instructor:
         return 3;
-      case UserRole.contentModerator:
+      case UserRole.moderator:
         return 4;
       case UserRole.admin:
         return 5;
-      case UserRole.superAdmin:
-        return 6;
     }
   }
 
-  // اضافه کردن گتر uid برای دسترسی به شناسه کاربر
   String get uid {
-    // این یک شناسه منحصر به فرد برای هر نقش است
     switch (this) {
       case UserRole.guest:
         return 'guest';
-      case UserRole.registeredUser:
-        return 'registered_user';
+      case UserRole.normaluser:
+        return 'normal_user';
       case UserRole.student:
         return 'student';
       case UserRole.instructor:
         return 'instructor';
-      case UserRole.contentModerator:
-        return 'content_moderator';
+      case UserRole.moderator:
+        return 'moderator';
       case UserRole.admin:
         return 'admin';
-      case UserRole.superAdmin:
-        return 'super_admin';
     }
   }
 
-  // متد کمکی برای بررسی دسترسی
   bool hasAccess(UserRole requiredRole) {
     return level >= requiredRole.level;
   }

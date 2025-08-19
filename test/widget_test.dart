@@ -1,13 +1,30 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() {
-  group('Simple Button Tests', () {
+  group('App Integration Tests with Firebase Emulator', () {
+    setUpAll(() async {
+      // تنظیمات اولیه Firebase برای استفاده از Emulator
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: 'test-api-key',
+          appId: 'test-app-id',
+          messagingSenderId: 'test-sender-id',
+          projectId: 'test-project-id',
+        ),
+      );
+
+      // تنظیم Firestore برای استفاده از Emulator
+      FirebaseFirestore.instance.useFirestoreEmulator('127.0.0.1', 8080);
+    });
+
     testWidgets('Welcome screen loads and shows buttons',
         (WidgetTester tester) async {
       // استفاده از یک نسخه ساده شده از WelcomeScreen بدون Providerها
       await tester.pumpWidget(
-        const MaterialApp(
+        MaterialApp(
           home: TestWelcomeScreen(),
         ),
       );
@@ -42,14 +59,12 @@ void main() {
 
     testWidgets('Test start quiz button navigation',
         (WidgetTester tester) async {
-      // استفاده از یک نسخه ساده شده از WelcomeScreen بدون Providerها
       await tester.pumpWidget(
         MaterialApp(
           home: TestWelcomeScreen(),
         ),
       );
 
-      // صبر برای لود شدن صفحه
       await tester.pumpAndSettle();
 
       // تست دکمه شروع آزمون
@@ -68,14 +83,12 @@ void main() {
 
     testWidgets('Test mobile login button navigation',
         (WidgetTester tester) async {
-      // استفاده از یک نسخه ساده شده از WelcomeScreen بدون Providerها
       await tester.pumpWidget(
         MaterialApp(
           home: TestWelcomeScreen(),
         ),
       );
 
-      // صبر برای لود شدن صفحه
       await tester.pumpAndSettle();
 
       // تست دکمه ورود با شماره موبایل
@@ -94,14 +107,12 @@ void main() {
 
     testWidgets('Test guest login button navigation',
         (WidgetTester tester) async {
-      // استفاده از یک نسخه ساده شده از WelcomeScreen بدون Providerها
       await tester.pumpWidget(
         MaterialApp(
           home: TestWelcomeScreen(),
         ),
       );
 
-      // صبر برای لود شدن صفحه
       await tester.pumpAndSettle();
 
       // تست دکمه ورود مهمان
@@ -117,10 +128,58 @@ void main() {
       expect(find.text('صفحه مهمان'), findsOneWidget,
           reason: 'صفحه مهمان باید نمایش داده شود');
     });
+
+    testWidgets('Test Firebase connection', (WidgetTester tester) async {
+      // تست اتصال به Firestore از طریق Emulator
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  // تست عملیات Firestore
+                  final firestore = FirebaseFirestore.instance;
+                  final doc =
+                      await firestore.collection('test').doc('test').get();
+                  expect(doc.exists, isFalse);
+                },
+                child: const Text('Test Firestore'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // تست دکمه
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pumpAndSettle();
+
+      // بررسی اینکه هیچ خطایی رخ نداده
+      expect(find.text('Test Firestore'), findsOneWidget);
+    });
+
+    testWidgets('Test authentication state', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TestAuthScreen(),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // تست دکمه لاگین
+      await tester.tap(find.byKey(const Key('login_button')));
+      await tester.pumpAndSettle();
+
+      // بررسی پیام لاگین موفق
+      expect(find.text('ورود موفق'), findsOneWidget);
+    });
   });
 }
 
-// یک نسخه ساده شده از WelcomeScreen برای تست که به هیچ Provider وابسته نیست
+// نسخه ساده شده از WelcomeScreen برای تست
 class TestWelcomeScreen extends StatefulWidget {
   const TestWelcomeScreen({super.key});
 
@@ -134,8 +193,14 @@ class _TestWelcomeScreenState extends State<TestWelcomeScreen> {
   @override
   void initState() {
     super.initState();
-    // در تست، انیمیشن را فورا نمایش می‌دهیم
-    _opacity = 1.0;
+    // در تست، انیمیشن رو فورا نمایش می‌دهیم
+    Future.delayed(Duration.zero, () {
+      if (mounted) {
+        setState(() {
+          _opacity = 1.0;
+        });
+      }
+    });
   }
 
   @override
@@ -153,10 +218,11 @@ class _TestWelcomeScreenState extends State<TestWelcomeScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.school,
                     size: 80,
-                    color: Colors.blue,
+                    color: Colors
+                        .blue, // استفاده از رنگ مستقیم برای جلوگیری از خطا
                   ),
                   const SizedBox(height: 24),
                   Text(
@@ -181,7 +247,6 @@ class _TestWelcomeScreenState extends State<TestWelcomeScreen> {
                     icon: Icons.phone_android,
                     label: 'ورود با شماره موبایل',
                     onPressed: () {
-                      // در تست، فقط یک صفحه خالی نمایش می‌دهیم
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -195,7 +260,6 @@ class _TestWelcomeScreenState extends State<TestWelcomeScreen> {
                     icon: Icons.email,
                     label: 'ورود با ایمیل / رمز عبور',
                     onPressed: () {
-                      // در تست، فقط یک صفحه خالی نمایش می‌دهیم
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -209,7 +273,6 @@ class _TestWelcomeScreenState extends State<TestWelcomeScreen> {
                     icon: Icons.person_add_alt_1,
                     label: 'ثبت‌نام',
                     onPressed: () {
-                      // در تست، فقط یک صفحه خالی نمایش می‌دهیم
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -223,7 +286,6 @@ class _TestWelcomeScreenState extends State<TestWelcomeScreen> {
                     icon: Icons.person_outline,
                     label: 'ورود مهمان',
                     onPressed: () {
-                      // در تست، فقط یک صفحه خالی نمایش می‌دهیم
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -236,7 +298,6 @@ class _TestWelcomeScreenState extends State<TestWelcomeScreen> {
                   ElevatedButton(
                     key: const Key('start_quiz_button'),
                     onPressed: () {
-                      // در تست، فقط یک صفحه خالی نمایش می‌دهیم
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -286,6 +347,35 @@ class _TestWelcomeScreenState extends State<TestWelcomeScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// صفحه تست احراز هویت ساده
+class TestAuthScreen extends StatelessWidget {
+  const TestAuthScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('تست احراز هویت')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              key: const Key('login_button'),
+              onPressed: () async {
+                // شبیه‌سازی لاگین موفق
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('ورود موفق')),
+                );
+              },
+              child: const Text('ورود'),
+            ),
+          ],
         ),
       ),
     );

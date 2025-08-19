@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../utils/logger.dart';
 
 class RoleProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -20,7 +21,7 @@ class RoleProvider with ChangeNotifier {
           notifyListeners();
         }
       } catch (e) {
-        print('Error checking user role: $e');
+        Logger.error('Error checking user role: $e'); // ✅ بهترین راه‌حل
       }
     }
   }

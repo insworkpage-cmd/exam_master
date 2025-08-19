@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/question_service.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' as app_auth;
 import '../../core/question_model.dart';
 import '../../models/user_role.dart';
 import '../../widgets/role_based_access.dart';
 import '../../widgets/question_status_badge.dart';
+import '../../models/question_stats_model.dart';
 
 class QuestionApprovalPage extends StatefulWidget {
   const QuestionApprovalPage({super.key});
@@ -20,12 +21,9 @@ class _QuestionApprovalPageState extends State<QuestionApprovalPage> {
   bool _isLoading = true;
   String _selectedStatus = 'pending';
   final TextEditingController _searchController = TextEditingController();
-  Map<String, int> _stats = {
-    'total': 0,
-    'pending': 0,
-    'approved': 0,
-    'rejected': 0,
-  };
+
+  // تغییر اصلی: استفاده از مدل QuestionStats
+  QuestionStats? _stats;
 
   @override
   void initState() {
@@ -48,13 +46,18 @@ class _QuestionApprovalPageState extends State<QuestionApprovalPage> {
   Future<void> _loadQuestions() async {
     setState(() => _isLoading = true);
     try {
-      _stats = await QuestionService.getQuestionStats();
+      final questionService = QuestionService();
+
+      // تغییر: استفاده مستقیم از مدل بدون تبدیل
+      _stats = await questionService.getQuestionStats();
+
       List<Question> questions;
       if (_selectedStatus == 'all') {
-        questions = await QuestionService.getAllQuestions();
+        questions = await questionService.getAllQuestions();
       } else {
-        questions = await QuestionService.getQuestionsByStatus(_selectedStatus);
+        questions = await questionService.getQuestionsByStatus(_selectedStatus);
       }
+
       setState(() {
         _questions = questions;
       });
@@ -86,7 +89,7 @@ class _QuestionApprovalPageState extends State<QuestionApprovalPage> {
   @override
   Widget build(BuildContext context) {
     return RoleBasedAccess(
-      requiredRole: UserRole.contentModerator,
+      requiredRole: UserRole.moderator,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('تأیید سوالات'),
@@ -146,13 +149,14 @@ class _QuestionApprovalPageState extends State<QuestionApprovalPage> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildStatCard('کل', _stats['total']!, Colors.blue),
+              // تغییر: استفاده از ویژگی‌های مدل با null safety
+              _buildStatCard('کل', _stats?.total ?? 0, Colors.blue),
               const SizedBox(width: 12),
-              _buildStatCard('در انتظار', _stats['pending']!, Colors.orange),
+              _buildStatCard('در انتظار', _stats?.pending ?? 0, Colors.orange),
               const SizedBox(width: 12),
-              _buildStatCard('تأیید شده', _stats['approved']!, Colors.green),
+              _buildStatCard('تأیید شده', _stats?.approved ?? 0, Colors.green),
               const SizedBox(width: 12),
-              _buildStatCard('رد شده', _stats['rejected']!, Colors.red),
+              _buildStatCard('رد شده', _stats?.rejected ?? 0, Colors.red),
             ],
           ),
         ],
@@ -335,8 +339,10 @@ class _QuestionApprovalPageState extends State<QuestionApprovalPage> {
 
     if (confirmed == true && mounted) {
       try {
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        await QuestionService.approveQuestion(
+        final authProvider =
+            Provider.of<app_auth.AuthProvider>(context, listen: false);
+        final questionService = QuestionService();
+        await questionService.approveQuestion(
             question.id, authProvider.currentUser!.uid);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -394,8 +400,10 @@ class _QuestionApprovalPageState extends State<QuestionApprovalPage> {
 
     if (result == true && mounted) {
       try {
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        await QuestionService.rejectQuestion(question.id,
+        final authProvider =
+            Provider.of<app_auth.AuthProvider>(context, listen: false);
+        final questionService = QuestionService();
+        await questionService.rejectQuestion(question.id,
             authProvider.currentUser!.uid, reasonController.text.trim());
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

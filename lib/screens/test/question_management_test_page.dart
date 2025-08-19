@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_provider.dart' as app_auth; // ← اصلاح import
 import '../../models/user_role.dart';
 import '../../widgets/question_status_badge.dart';
 
@@ -13,12 +13,12 @@ class QuestionManagementTestPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('تست مدیریت سوالات'),
       ),
-      body: Consumer<AuthProvider>(
+      body: Consumer<app_auth.AuthProvider>(
+        // ← اصلاح: AuthProvider با prefix
         builder: (context, authProvider, child) {
           if (authProvider.currentUser == null) {
             return const Center(child: Text('لطفاً وارد شوید'));
           }
-
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -28,7 +28,8 @@ class QuestionManagementTestPage extends StatelessWidget {
                 'بررسی افزودن سوال توسط مدرس',
                 Icons.add,
                 Colors.blue,
-                () => Navigator.pushNamed(context, '/question-management'),
+                () => Navigator.pushNamed(
+                    context, '/instructor_question_management'), // ← اصلاح مسیر
               ),
               _buildTestCard(
                 context,
@@ -36,7 +37,8 @@ class QuestionManagementTestPage extends StatelessWidget {
                 'بررسی تأیید سوال توسط ناظر محتوا',
                 Icons.approval,
                 Colors.green,
-                () => Navigator.pushNamed(context, '/question-approval'),
+                () => Navigator.pushNamed(
+                    context, '/moderator_question_approval'), // ← اصلاح مسیر
               ),
               _buildTestCard(
                 context,
@@ -119,7 +121,9 @@ class QuestionManagementTestPage extends StatelessWidget {
             ),
             _buildAccessTestItem(
               'تأیید سوال',
-              userRole.level >= UserRole.contentModerator.level,
+              userRole.level >=
+                  UserRole
+                      .moderator.level, // ← اصلاح: contentModerator → moderator
             ),
           ],
         ),

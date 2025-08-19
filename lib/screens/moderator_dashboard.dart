@@ -8,10 +8,10 @@ class ModeratorDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RoleBasedAccess(
-      requiredRole: UserRole.contentModerator,
+      requiredRole: UserRole.moderator, // ← اصلاح: contentModerator → moderator
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('پنل ناظر محتوا'),
+          title: const Text('پنل ناظر'),
           backgroundColor: Colors.orange,
         ),
         body: Center(
@@ -21,14 +21,14 @@ class ModeratorDashboard extends StatelessWidget {
               const Icon(Icons.content_paste, size: 80, color: Colors.orange),
               const SizedBox(height: 16),
               const Text(
-                // ✅ const اضافه شد
-                'دسترسی ناظر محتوا به بخش‌های محتوا',
+                'دسترسی ناظر به بخش‌های محتوا',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: () {
-                  Navigator.pushNamed(context, '/question-approval');
+                  Navigator.pushNamed(
+                      context, '/moderator_question_approval'); // ← اصلاح مسیر
                 },
                 icon: const Icon(Icons.approval),
                 label: const Text('تأیید سوالات'),

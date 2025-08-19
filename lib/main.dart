@@ -28,32 +28,28 @@ import 'providers/theme_provider.dart';
 import 'models/user_role.dart';
 import 'widgets/role_based_access.dart';
 import 'models/user_model.dart';
+import 'screens/normal_user_dashboard.dart'; // ← اضافه شد
 
-// تعریف کلاس‌های داشبورد قبل از MaterialApp
 class StudentDashboard extends StatelessWidget {
   const StudentDashboard({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return const RoleBasedAccess(
-      // ✅ const اضافه شد
+    return RoleBasedAccess(
       requiredRole: UserRole.student,
-      child: Scaffold(
-        // ❌ const حذف شد (چون فرزندان غیر-const دارد)
+      child: const Scaffold(
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.school,
-                  size: 80, color: Colors.green), // ✅ const اضافه شد
-              SizedBox(height: 16), // ✅ const اضافه شد
+              Icon(Icons.school, size: 80, color: Colors.green),
+              SizedBox(height: 16),
               Text(
                 'پنل دانشجو',
-                style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold), // ✅ const اضافه شد
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 8), // ✅ const اضافه شد
-              Text('دسترسی دانشجو'), // ✅ const اضافه شد
+              SizedBox(height: 8),
+              Text('دسترسی دانشجو'),
             ],
           ),
         ),
@@ -69,6 +65,7 @@ class AdminDashboard extends StatelessWidget {
     return RoleBasedAccess(
       requiredRole: UserRole.admin,
       child: const Scaffold(
+        // ← const حذف شد
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -94,8 +91,9 @@ class ModeratorDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RoleBasedAccess(
-      requiredRole: UserRole.contentModerator,
+      requiredRole: UserRole.moderator,
       child: const Scaffold(
+        // ← const حذف شد
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -103,11 +101,11 @@ class ModeratorDashboard extends StatelessWidget {
               Icon(Icons.content_paste, size: 80, color: Colors.orange),
               SizedBox(height: 16),
               Text(
-                'پنل ناظر محتوا',
+                'پنل ناظر',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 8),
-              Text('دسترسی ناظر محتوا'),
+              Text('دسترسی ناظر'),
             ],
           ),
         ),
@@ -172,24 +170,33 @@ class ExamMasterApp extends StatelessWidget {
             '/login': (_) => const EmailLoginPage(),
             '/register': (_) => const RegisterPage(),
             '/reset-password': (_) => ResetPasswordPage(),
-            '/guest-home': (_) => const GuestHomePage(),
+            '/guest_home': (_) =>
+                const GuestHomePage(), // ← اصلاح: guest-home → guest_home
             '/quiz': (_) => const QuizPage(),
             // مسیرهای دانشجو و مدرس
-            '/student-dashboard': (_) => const StudentDashboard(),
-            '/instructor-classes': (_) => const InstructorClassListPage(),
+            '/student_dashboard': (_) =>
+                const StudentDashboard(), // ← اصلاح: student-dashboard → student_dashboard
+            '/instructor_dashboard': (_) =>
+                const InstructorClassListPage(), // ← اصلاح: instructor-classes → instructor_dashboard
             // مسیرهای مدیریت سوالات
-            '/instructor-question-management': (_) =>
-                const QuestionManagementPage(),
-            '/moderator-question-approval': (_) => const QuestionApprovalPage(),
+            '/instructor_question_management': (_) =>
+                const QuestionManagementPage(), // ← اصلاح: instructor-question-management
+            '/moderator_question_approval': (_) =>
+                const QuestionApprovalPage(), // ← اصلاح: moderator-question-approval
             // مسیرهای مدیریتی
-            '/admin-dashboard': (_) => const AdminDashboard(),
-            '/moderator-dashboard': (_) => const ModeratorDashboard(),
-            '/admin-panel': (_) => const AdminPanelPage(),
-            '/user-management': (_) => const UserManagementPage(),
-            '/class-management': (_) => const ClassManagementPage(),
+            '/admin_dashboard': (_) =>
+                const AdminDashboard(), // ← اصلاح: admin-dashboard → admin_dashboard
+            '/moderator_dashboard': (_) =>
+                const ModeratorDashboard(), // ← اصلاح: moderator-dashboard → moderator_dashboard
+            '/admin_panel': (_) => const AdminPanelPage(),
+            '/user_management': (_) => const UserManagementPage(),
+            '/class_management': (_) => const ClassManagementPage(),
             '/reports': (_) => const ReportsPage(),
-            '/system-monitor': (_) => const SystemMonitorPage(),
+            '/system_monitor': (_) => const SystemMonitorPage(),
             '/settings': (_) => const SettingsPage(),
+            // مسیرهای جدید
+            '/normaluser_dashboard': (_) =>
+                const NormalUserDashboard(), // ← اضافه شد
           },
         );
       },
@@ -251,7 +258,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.school,
                         size: 80,
                         color: AppTheme.primaryColor,
@@ -304,7 +311,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         onPressed: () async {
                           await authProvider.setGuestMode();
                           if (!context.mounted) return;
-                          Navigator.pushNamed(context, '/guest-home');
+                          Navigator.pushNamed(context, '/guest_home');
                         },
                       ),
                       const SizedBox(height: 30),
@@ -336,7 +343,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Widget _buildButton({
-    Key? key, // اضافه کردن پارامتر key
+    Key? key,
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
@@ -344,7 +351,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: ElevatedButton.icon(
-        key: key, // استفاده از key
+        key: key,
         onPressed: onPressed,
         icon: Icon(icon, size: 20),
         label: Text(label),
@@ -369,12 +376,14 @@ class _DashboardRouter extends StatelessWidget {
     switch (user.role) {
       case UserRole.admin:
         return const AdminDashboard();
-      case UserRole.contentModerator:
+      case UserRole.moderator: // ← اصلاح: contentModerator → moderator
         return const ModeratorDashboard();
       case UserRole.instructor:
         return const InstructorClassListPage();
       case UserRole.student:
         return const StudentDashboard();
+      case UserRole.normaluser: // ← اضافه شد
+        return const NormalUserDashboard();
       default:
         return const Scaffold(
           body: Center(child: Text('داشبورد کاربر')),
