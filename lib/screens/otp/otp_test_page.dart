@@ -1,7 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:flutter_otp_text_field/flutter_otp_text_field.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../providers/auth_provider.dart' as app_auth;
+import '../../providers/theme_provider.dart';
+import '../../models/user_role.dart';
 
 class OtpTestPage extends StatefulWidget {
   const OtpTestPage({super.key});
@@ -11,96 +17,484 @@ class OtpTestPage extends StatefulWidget {
 }
 
 class _OtpTestPageState extends State<OtpTestPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _phoneController = TextEditingController();
+  final _otpController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   String phoneNumber = '';
+  String verificationId = '';
   bool codeSent = false;
   bool isLoading = false;
+  bool isVerifying = false;
   int secondsRemaining = 0;
   Timer? _timer;
+  String? _phoneError;
+  String? _otpError;
 
-  void sendOtp() {
+  @override
+  void initState() {
+    super.initState();
+    _phoneController.addListener(_validatePhone);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _phoneController.removeListener(_validatePhone);
+    _phoneController.dispose();
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  void _validatePhone() {
+    final phone = _phoneController.text;
     setState(() {
-      codeSent = true;
+      if (phone.isEmpty) {
+        _phoneError = 'شماره موبایل را وارد کنید';
+      } else if (!RegExp(r'^[0-9]{10}$')
+          .hasMatch(phone.replaceAll(RegExp(r'[^\d]'), ''))) {
+        _phoneError = 'شماره موبایل نامعتبر است';
+      } else {
+        _phoneError = null;
+      }
+    });
+  }
+
+  Future<void> sendOtp() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
       isLoading = true;
-      secondsRemaining = 60;
+      _phoneError = null;
     });
 
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // این بخش زمانی اجرا می‌شود که OTP به صورت خودکار تایید شود
+          await _signInWithCredential(credential);
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          setState(() {
+            isLoading = false;
+            if (e.code == 'invalid-phone-number') {
+              _phoneError = 'شماره موبایل نامعتبر است';
+            } else {
+              _phoneError = 'خطا در ارسال کد: ${e.message}';
+            }
+          });
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          setState(() {
+            codeSent = true;
+            isLoading = false;
+            secondsRemaining = 60;
+            this.verificationId = verificationId;
+          });
+          _startTimer();
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          setState(() {
+            isLoading = false;
+            codeSent = false;
+          });
+        },
+        timeout: const Duration(seconds: 60),
+      );
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        _phoneError = 'خطا در ارسال کد: ${e.toString()}';
+      });
+    }
+  }
+
+  void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (secondsRemaining == 0) {
         timer.cancel();
-        setState(() => isLoading = false);
+        setState(() {});
       } else {
         setState(() => secondsRemaining--);
       }
     });
   }
 
-  void verifyCode(String code) {
-    // در اینجا باید به Firebase Auth وصل بشه
-    debugPrint('کد وارد شده: $code');
+  Future<void> verifyCode(String code) async {
+    if (code.isEmpty) {
+      setState(() {
+        _otpError = 'کد تایید را وارد کنید';
+      });
+      return;
+    }
+
+    setState(() {
+      isVerifying = true;
+      _otpError = null;
+    });
+
+    try {
+      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: code,
+      );
+
+      await _signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        isVerifying = false;
+        if (e.code == 'invalid-verification-code') {
+          _otpError = 'کد تایید نامعتبر است';
+        } else {
+          _otpError = 'خطا در تایید کد: ${e.message}';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        isVerifying = false;
+        _otpError = 'خطا در تایید کد: ${e.toString()}';
+      });
+    }
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+  Future<void> _signInWithCredential(PhoneAuthCredential credential) async {
+    try {
+      setState(() {
+        isVerifying = true;
+      });
+
+      final UserCredential userCredential =
+          await _auth.signInWithCredential(credential);
+      final User? user = userCredential.user;
+
+      if (user != null) {
+        // دریافت AuthProvider قبل از عملیات async
+        final authProvider =
+            Provider.of<app_auth.AuthProvider>(context, listen: false);
+
+        // بررسی اینکه آیا کاربر قبلاً ثبت‌نام کرده است
+        final userDoc =
+            await _firestore.collection('users').doc(user.uid).get();
+
+        if (!userDoc.exists) {
+          // اگر کاربر جدید است، اطلاعات اولیه را ذخیره کن
+          await _firestore.collection('users').doc(user.uid).set({
+            'uid': user.uid,
+            'email': user.email ?? '',
+            'phone': phoneNumber,
+            'name': 'کاربر مهمان',
+            'role': UserRole.normaluser.name,
+            'createdAt': DateTime.now().toIso8601String(),
+            'isActive': true,
+          });
+        }
+
+        // به‌روزرسانی AuthProvider
+        await authProvider.initialize();
+
+        // هدایت به صفحه مناسب بر اساس نقش کاربر
+        _navigateToDashboard(authProvider.userRole);
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        isVerifying = false;
+        _otpError = 'خطا در ورود: ${e.message}';
+      });
+    } catch (e) {
+      setState(() {
+        isVerifying = false;
+        _otpError = 'خطای غیرمنتظره: ${e.toString()}';
+      });
+    }
+  }
+
+  void _navigateToDashboard(UserRole? role) {
+    if (!mounted) return;
+
+    String route;
+    switch (role) {
+      case UserRole.admin:
+        route = '/admin_dashboard';
+        break;
+      case UserRole.moderator:
+        route = '/moderator_dashboard';
+        break;
+      case UserRole.instructor:
+        route = '/instructor_dashboard';
+        break;
+      case UserRole.student:
+        route = '/student_dashboard';
+        break;
+      case UserRole.normaluser:
+        route = '/normaluser_dashboard';
+        break;
+      default:
+        route = '/guest_home';
+    }
+
+    Navigator.pushReplacementNamed(context, route);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('ورود با شماره موبایل'),
-          backgroundColor: Colors.indigo,
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(18.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (!codeSent) ...[
-                const Text('شماره موبایل خود را وارد کنید:'),
-                const SizedBox(height: 8),
-                IntlPhoneField(
-                  initialCountryCode: 'IR',
-                  decoration: const InputDecoration(
-                    labelText: 'شماره موبایل',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (phone) {
-                    phoneNumber = phone.completeNumber;
-                  },
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: phoneNumber.isEmpty ? null : sendOtp,
-                  child: const Text('ارسال کد'),
-                ),
-              ] else ...[
-                const Text('کد تایید را وارد کنید:'),
-                const SizedBox(height: 8),
-                OtpTextField(
-                  numberOfFields: 6,
-                  borderColor: Colors.indigo,
-                  focusedBorderColor: Colors.deepOrange,
-                  showFieldAsBox: true,
-                  fieldWidth: 40,
-                  onSubmit: verifyCode,
-                ),
-                const SizedBox(height: 12),
-                if (isLoading)
-                  Text('ارسال مجدد تا $secondsRemaining ثانیه دیگر')
-                else
-                  TextButton(
-                    onPressed: sendOtp,
-                    child: const Text('ارسال مجدد کد'),
-                  ),
-              ],
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+
+        return Scaffold(
+          // حل مشکل صفحه سفید
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            title: const Text('ورود با شماره موبایل'),
+            centerTitle: true,
+            backgroundColor: Colors.amber[700],
+            automaticallyImplyLeading: false,
+            actions: [
+              // دکمه حالت دارک مود در سمت چپ
+              IconButton(
+                icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
+                tooltip: isDarkMode ? 'حالت روشن' : 'حالت تاریک',
+                onPressed: () {
+                  themeProvider.toggleTheme();
+                },
+              ),
+              // دکمه بازگشت در سمت راست
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'بازگشت',
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
             ],
           ),
-        ),
-      ),
+          // حل مشکل صفحه سفید
+          body: Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDarkMode
+                    ? [
+                        const Color(0xFF1a1a2e),
+                        const Color(0xFF16213e),
+                        const Color(0xFF0f3460),
+                      ]
+                    : [
+                        const Color(0xFF667eea),
+                        const Color(0xFF764ba2),
+                        const Color(0xFFf093fb),
+                      ],
+              ),
+            ),
+            child: SafeArea(
+              child: Directionality(
+                textDirection: TextDirection.rtl,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: isDarkMode
+                                ? Colors.white.withOpacity(0.1)
+                                : Colors.black.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isDarkMode
+                                  ? Colors.white.withOpacity(0.2)
+                                  : Colors.black.withOpacity(0.1),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.phone_android,
+                                size: 64,
+                                color:
+                                    isDarkMode ? Colors.white : Colors.black87,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'ورود با شماره موبایل',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'کد تایید به شماره شما ارسال خواهد شد',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDarkMode
+                                      ? Colors.white70
+                                      : Colors.black54,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        if (!codeSent) ...[
+                          // حل مشکل راست‌چین نبودن کادر شماره موبایل
+                          Directionality(
+                            textDirection: TextDirection.ltr,
+                            child: IntlPhoneField(
+                              controller: _phoneController,
+                              initialCountryCode: 'IR',
+                              decoration: InputDecoration(
+                                labelText: 'شماره موبایل',
+                                hintText:
+                                    '9123456789', // تغییر: حذف صفر از ابتدا
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                prefixIcon: const Icon(Icons.phone),
+                                filled: true,
+                                fillColor: isDarkMode
+                                    ? Colors.white.withOpacity(0.1)
+                                    : Colors.white.withOpacity(0.7),
+                                errorStyle: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                errorText: _phoneError,
+                                // اضافه شده: وسط‌چین کردن labelText
+                                alignLabelWithHint: true,
+                                // اضافه شده: وسط‌چین کردن متن
+                                contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 16, horizontal: 12),
+                                // اضافه شده: استایل متن
+                                hintStyle: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.white54
+                                      : Colors.black54,
+                                ),
+                                labelStyle: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              textAlign: TextAlign.center,
+                              onChanged: (phone) {
+                                phoneNumber = phone.completeNumber;
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          if (isLoading)
+                            const CircularProgressIndicator()
+                          else
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _phoneError == null ? sendOtp : null,
+                                icon: const Icon(Icons.send),
+                                label: const Text('ارسال کد تایید'),
+                                style: ElevatedButton.styleFrom(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  backgroundColor: Colors.indigo,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                        ] else ...[
+                          const Text(
+                            'کد تایید را وارد کنید:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          OtpTextField(
+                            numberOfFields: 6,
+                            borderColor: Colors.indigo,
+                            focusedBorderColor: Colors.deepOrange,
+                            showFieldAsBox: true,
+                            fieldWidth: 40,
+                            borderRadius: BorderRadius.circular(8),
+                            fillColor: isDarkMode
+                                ? Colors.white.withOpacity(0.1)
+                                : Colors.white.withOpacity(0.7),
+                            textStyle: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black87,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            onSubmit: verifyCode,
+                          ),
+                          if (_otpError != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              _otpError!,
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          if (isVerifying)
+                            const CircularProgressIndicator()
+                          else if (isLoading)
+                            Text('ارسال مجدد تا $secondsRemaining ثانیه دیگر')
+                          else
+                            TextButton(
+                              onPressed: sendOtp,
+                              child: const Text('ارسال مجدد کد'),
+                            ),
+                        ],
+                        const SizedBox(height: 24),
+                        TextButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          icon: Icon(
+                            Icons.arrow_back,
+                            color: isDarkMode
+                                ? Colors.amber[300]
+                                : Colors.amber[700],
+                          ),
+                          label: Text(
+                            'بازگشت به صفحه ورود',
+                            style: TextStyle(
+                              color: isDarkMode
+                                  ? Colors.amber[300]
+                                  : Colors.amber[700],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
