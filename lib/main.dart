@@ -26,106 +26,13 @@ import 'screens/admin/settings_page.dart';
 import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
 import 'models/user_role.dart';
-import 'widgets/role_based_access.dart';
 import 'models/user_model.dart';
 import 'screens/normal_user_dashboard.dart';
-
-class StudentDashboard extends StatelessWidget {
-  const StudentDashboard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return RoleBasedAccess(
-      requiredRole: UserRole.student,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('پنل دانشجو'),
-          centerTitle: true,
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.school, size: 80, color: Colors.green),
-              const SizedBox(height: 16),
-              const Text(
-                'پنل دانشجو',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text('دسترسی دانشجو'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class AdminDashboard extends StatelessWidget {
-  const AdminDashboard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return RoleBasedAccess(
-      requiredRole: UserRole.admin,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('پنل مدیریت'),
-          centerTitle: true,
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.admin_panel_settings,
-                  size: 80, color: Colors.red),
-              const SizedBox(height: 16),
-              const Text(
-                'پنل مدیریت کل سیستم',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text('دسترسی ادمین'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class ModeratorDashboard extends StatelessWidget {
-  const ModeratorDashboard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return RoleBasedAccess(
-      requiredRole: UserRole.moderator,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('پنل ناظر'),
-          centerTitle: true,
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.content_paste, size: 80, color: Colors.orange),
-              const SizedBox(height: 16),
-              const Text(
-                'پنل ناظر',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text('دسترسی ناظر'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+import 'screens/student/student_dashboard.dart';
+import 'screens/admin_dashboard.dart';
+import 'screens/moderator_dashboard.dart';
+import 'screens/instructor/instructor_dashboard.dart';
+import 'screens/instructor/create_class_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -138,13 +45,11 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('❌ خطا در اتصال به Firebase: $e');
   }
-
   final prefs = await SharedPreferences.getInstance();
   final isGuest = prefs.getBool('isGuest') ?? false;
   if (isGuest) {
     await prefs.remove('isGuest');
   }
-
   runApp(
     MultiProvider(
       providers: [
@@ -186,13 +91,13 @@ class ExamMasterApp extends StatelessWidget {
             '/profile': (_) => const UserProfilePage(),
             '/login': (_) => const EmailLoginPage(),
             '/register': (_) => const RegisterPage(),
-            '/reset-password': (_) => ResetPasswordPage(), // ← const حذف شد
+            '/reset-password': (_) => ResetPasswordPage(),
             '/guest_home': (_) => const GuestHomePage(),
             '/quiz': (_) => const QuizPage(),
 
-            // مسیرهای داشبورها
+            // مسیرهای داشبوردها
             '/student_dashboard': (_) => const StudentDashboard(),
-            '/instructor_dashboard': (_) => const InstructorClassListPage(),
+            '/instructor_dashboard': (_) => const InstructorDashboard(),
             '/normaluser_dashboard': (_) => const NormalUserDashboard(),
             '/moderator_dashboard': (_) => const ModeratorDashboard(),
             '/admin_dashboard': (_) => const AdminDashboard(),
@@ -209,6 +114,10 @@ class ExamMasterApp extends StatelessWidget {
             '/reports': (_) => const ReportsPage(),
             '/system_monitor': (_) => const SystemMonitorPage(),
             '/settings': (_) => const SettingsPage(),
+
+            // مسیرهای استاد
+            '/instructor_create_class': (_) => const CreateClassPage(),
+            '/instructor_classes': (_) => const InstructorClassListPage(),
           },
         );
       },
@@ -396,7 +305,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
 class _DashboardRouter extends StatelessWidget {
   final UserModel user;
-
   const _DashboardRouter({required this.user});
 
   @override
@@ -414,8 +322,8 @@ class _DashboardRouter extends StatelessWidget {
         debugPrint('Routing to ModeratorDashboard');
         return const ModeratorDashboard();
       case UserRole.instructor:
-        debugPrint('Routing to InstructorClassListPage');
-        return const InstructorClassListPage();
+        debugPrint('Routing to InstructorDashboard');
+        return const InstructorDashboard();
       case UserRole.student:
         debugPrint('Routing to StudentDashboard');
         return const StudentDashboard();

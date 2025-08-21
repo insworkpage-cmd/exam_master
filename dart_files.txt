@@ -32,6 +32,8 @@ E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\common\not
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\guest\guest_home_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\instructor\class_detail_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\instructor\class_list_page.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\instructor\create_class_page.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\instructor\instructor_dashboard.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\instructor\question_management_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\moderator\question_approval_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\otp\otp_test_page.dart
