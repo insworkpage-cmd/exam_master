@@ -22,7 +22,6 @@ class _OtpTestPageState extends State<OtpTestPage> {
   final _otpController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
   String phoneNumber = '';
   String verificationId = '';
   bool codeSent = false;
@@ -53,9 +52,11 @@ class _OtpTestPageState extends State<OtpTestPage> {
     setState(() {
       if (phone.isEmpty) {
         _phoneError = 'شماره موبایل را وارد کنید';
+      } else if (!phone.startsWith('9')) {
+        _phoneError = 'شماره موبایل باید با 9 شروع شود';
       } else if (!RegExp(r'^[0-9]{10}$')
           .hasMatch(phone.replaceAll(RegExp(r'[^\d]'), ''))) {
-        _phoneError = 'شماره موبایل نامعتبر است';
+        _phoneError = 'شماره موبایل باید 10 رقم باشد';
       } else {
         _phoneError = null;
       }
@@ -64,12 +65,10 @@ class _OtpTestPageState extends State<OtpTestPage> {
 
   Future<void> sendOtp() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() {
       isLoading = true;
       _phoneError = null;
     });
-
     try {
       await _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber,
@@ -78,37 +77,45 @@ class _OtpTestPageState extends State<OtpTestPage> {
           await _signInWithCredential(credential);
         },
         verificationFailed: (FirebaseAuthException e) {
-          setState(() {
-            isLoading = false;
-            if (e.code == 'invalid-phone-number') {
-              _phoneError = 'شماره موبایل نامعتبر است';
-            } else {
-              _phoneError = 'خطا در ارسال کد: ${e.message}';
-            }
-          });
+          if (mounted) {
+            setState(() {
+              isLoading = false;
+              if (e.code == 'invalid-phone-number') {
+                _phoneError = 'شماره موبایل نامعتبر است';
+              } else {
+                _phoneError = 'خطا در ارسال کد: ${e.message}';
+              }
+            });
+          }
         },
         codeSent: (String verificationId, int? resendToken) {
-          setState(() {
-            codeSent = true;
-            isLoading = false;
-            secondsRemaining = 60;
-            this.verificationId = verificationId;
-          });
-          _startTimer();
+          if (mounted) {
+            setState(() {
+              codeSent = true;
+              isLoading = false;
+              secondsRemaining = 60;
+              this.verificationId = verificationId;
+            });
+            _startTimer();
+          }
         },
         codeAutoRetrievalTimeout: (String verificationId) {
-          setState(() {
-            isLoading = false;
-            codeSent = false;
-          });
+          if (mounted) {
+            setState(() {
+              isLoading = false;
+              codeSent = false;
+            });
+          }
         },
         timeout: const Duration(seconds: 60),
       );
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        _phoneError = 'خطا در ارسال کد: ${e.toString()}';
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          _phoneError = 'خطا در ارسال کد: ${e.toString()}';
+        });
+      }
     }
   }
 
@@ -116,69 +123,76 @@ class _OtpTestPageState extends State<OtpTestPage> {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (secondsRemaining == 0) {
         timer.cancel();
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
       } else {
-        setState(() => secondsRemaining--);
+        if (mounted) {
+          setState(() => secondsRemaining--);
+        }
       }
     });
   }
 
   Future<void> verifyCode(String code) async {
     if (code.isEmpty) {
-      setState(() {
-        _otpError = 'کد تایید را وارد کنید';
-      });
+      if (mounted) {
+        setState(() {
+          _otpError = 'کد تایید را وارد کنید';
+        });
+      }
       return;
     }
-
-    setState(() {
-      isVerifying = true;
-      _otpError = null;
-    });
-
+    if (mounted) {
+      setState(() {
+        isVerifying = true;
+        _otpError = null;
+      });
+    }
     try {
       PhoneAuthCredential credential = PhoneAuthProvider.credential(
         verificationId: verificationId,
         smsCode: code,
       );
-
       await _signInWithCredential(credential);
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        isVerifying = false;
-        if (e.code == 'invalid-verification-code') {
-          _otpError = 'کد تایید نامعتبر است';
-        } else {
-          _otpError = 'خطا در تایید کد: ${e.message}';
-        }
-      });
+      if (mounted) {
+        setState(() {
+          isVerifying = false;
+          if (e.code == 'invalid-verification-code') {
+            _otpError = 'کد تایید نامعتبر است';
+          } else {
+            _otpError = 'خطا در تایید کد: ${e.message}';
+          }
+        });
+      }
     } catch (e) {
-      setState(() {
-        isVerifying = false;
-        _otpError = 'خطا در تایید کد: ${e.toString()}';
-      });
+      if (mounted) {
+        setState(() {
+          isVerifying = false;
+          _otpError = 'خطا در تایید کد: ${e.toString()}';
+        });
+      }
     }
   }
 
   Future<void> _signInWithCredential(PhoneAuthCredential credential) async {
     try {
-      setState(() {
-        isVerifying = true;
-      });
-
+      if (mounted) {
+        setState(() {
+          isVerifying = true;
+        });
+      }
+      // دریافت AuthProvider قبل از عملیات async
+      final authProvider =
+          Provider.of<app_auth.AuthProvider>(context, listen: false);
       final UserCredential userCredential =
           await _auth.signInWithCredential(credential);
       final User? user = userCredential.user;
-
       if (user != null) {
-        // دریافت AuthProvider قبل از عملیات async
-        final authProvider =
-            Provider.of<app_auth.AuthProvider>(context, listen: false);
-
         // بررسی اینکه آیا کاربر قبلاً ثبت‌نام کرده است
         final userDoc =
             await _firestore.collection('users').doc(user.uid).get();
-
         if (!userDoc.exists) {
           // اگر کاربر جدید است، اطلاعات اولیه را ذخیره کن
           await _firestore.collection('users').doc(user.uid).set({
@@ -191,29 +205,33 @@ class _OtpTestPageState extends State<OtpTestPage> {
             'isActive': true,
           });
         }
-
         // به‌روزرسانی AuthProvider
         await authProvider.initialize();
-
-        // هدایت به صفحه مناسب بر اساس نقش کاربر
-        _navigateToDashboard(authProvider.userRole);
+        // بررسی مجدد mounted قبل از استفاده از context
+        if (mounted) {
+          // هدایت به صفحه مناسب بر اساس نقش کاربر
+          _navigateToDashboard(authProvider.userRole);
+        }
       }
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        isVerifying = false;
-        _otpError = 'خطا در ورود: ${e.message}';
-      });
+      if (mounted) {
+        setState(() {
+          isVerifying = false;
+          _otpError = 'خطا در ورود: ${e.message}';
+        });
+      }
     } catch (e) {
-      setState(() {
-        isVerifying = false;
-        _otpError = 'خطای غیرمنتظره: ${e.toString()}';
-      });
+      if (mounted) {
+        setState(() {
+          isVerifying = false;
+          _otpError = 'خطای غیرمنتظره: ${e.toString()}';
+        });
+      }
     }
   }
 
   void _navigateToDashboard(UserRole? role) {
     if (!mounted) return;
-
     String route;
     switch (role) {
       case UserRole.admin:
@@ -234,7 +252,6 @@ class _OtpTestPageState extends State<OtpTestPage> {
       default:
         route = '/guest_home';
     }
-
     Navigator.pushReplacementNamed(context, route);
   }
 
@@ -243,9 +260,10 @@ class _OtpTestPageState extends State<OtpTestPage> {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+        // تعریف رنگ خطا متناسب با حالت روز و شب
+        final errorColor = isDarkMode ? Colors.red[300]! : Colors.red[800]!;
 
         return Scaffold(
-          // حل مشکل صفحه سفید
           extendBodyBehindAppBar: true,
           appBar: AppBar(
             title: const Text('ورود با شماره موبایل'),
@@ -253,7 +271,6 @@ class _OtpTestPageState extends State<OtpTestPage> {
             backgroundColor: Colors.amber[700],
             automaticallyImplyLeading: false,
             actions: [
-              // دکمه حالت دارک مود در سمت چپ
               IconButton(
                 icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
                 tooltip: isDarkMode ? 'حالت روشن' : 'حالت تاریک',
@@ -261,7 +278,6 @@ class _OtpTestPageState extends State<OtpTestPage> {
                   themeProvider.toggleTheme();
                 },
               ),
-              // دکمه بازگشت در سمت راست
               IconButton(
                 icon: const Icon(Icons.arrow_back),
                 tooltip: 'بازگشت',
@@ -271,7 +287,6 @@ class _OtpTestPageState extends State<OtpTestPage> {
               ),
             ],
           ),
-          // حل مشکل صفحه سفید
           body: Container(
             width: double.infinity,
             height: double.infinity,
@@ -350,52 +365,99 @@ class _OtpTestPageState extends State<OtpTestPage> {
                         ),
                         const SizedBox(height: 32),
                         if (!codeSent) ...[
-                          // حل مشکل راست‌چین نبودن کادر شماره موبایل
-                          Directionality(
-                            textDirection: TextDirection.ltr,
-                            child: IntlPhoneField(
-                              controller: _phoneController,
-                              initialCountryCode: 'IR',
-                              decoration: InputDecoration(
-                                labelText: 'شماره موبایل',
-                                hintText:
-                                    '9123456789', // تغییر: حذف صفر از ابتدا
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                prefixIcon: const Icon(Icons.phone),
-                                filled: true,
-                                fillColor: isDarkMode
-                                    ? Colors.white.withOpacity(0.1)
-                                    : Colors.white.withOpacity(0.7),
-                                errorStyle: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                errorText: _phoneError,
-                                // اضافه شده: وسط‌چین کردن labelText
-                                alignLabelWithHint: true,
-                                // اضافه شده: وسط‌چین کردن متن
-                                contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 16, horizontal: 12),
-                                // اضافه شده: استایل متن
-                                hintStyle: TextStyle(
-                                  color: isDarkMode
-                                      ? Colors.white54
-                                      : Colors.black54,
-                                ),
-                                labelStyle: TextStyle(
-                                  color: isDarkMode
-                                      ? Colors.white
-                                      : Colors.black87,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: isDarkMode
+                                  ? Colors.white.withOpacity(0.1)
+                                  : Colors.white.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isDarkMode
+                                    ? Colors.white.withOpacity(0.2)
+                                    : Colors.black.withOpacity(0.1),
                               ),
-                              textAlign: TextAlign.center,
-                              onChanged: (phone) {
-                                phoneNumber = phone.completeNumber;
-                              },
                             ),
+                            child: Column(
+                              children: [
+                                Directionality(
+                                  textDirection: TextDirection.ltr,
+                                  child: IntlPhoneField(
+                                    controller: _phoneController,
+                                    initialCountryCode: 'IR',
+                                    decoration: InputDecoration(
+                                      labelText: 'شماره موبایل',
+                                      hintText: '9123456789',
+                                      border: InputBorder.none,
+                                      prefixIcon: const Icon(Icons.phone),
+                                      filled: true,
+                                      fillColor: Colors.transparent,
+                                      errorStyle: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: errorColor,
+                                      ),
+                                      errorText: _phoneError,
+                                      alignLabelWithHint: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              vertical: 16, horizontal: 12),
+                                      hintStyle: TextStyle(
+                                        color: isDarkMode
+                                            ? Colors.white54
+                                            : Colors.black54,
+                                      ),
+                                      labelStyle: TextStyle(
+                                        color: isDarkMode
+                                            ? Colors.white
+                                            : Colors.black87,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    onChanged: (phone) {
+                                      phoneNumber = phone.completeNumber;
+                                    },
+                                    validator: (phone) {
+                                      if (phone == null ||
+                                          phone.number.isEmpty) {
+                                        return 'شماره موبایل را وارد کنید';
+                                      } else if (!phone.number
+                                          .startsWith('9')) {
+                                        return 'شماره موبایل باید با 9 شروع شود';
+                                      } else if (!RegExp(r'^[0-9]{10}$')
+                                          .hasMatch(phone.number)) {
+                                        return 'شماره موبایل باید 10 رقم باشد';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16.0, vertical: 8.0),
+                                  child: Text(
+                                    'شماره موبایل خود را بدون صفر وارد کنید',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDarkMode
+                                          ? Colors.white70
+                                          : Colors.black54,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'فقط شماره موبایل‌های ایرانی (شروع با ۹) مجاز هستند',
+                            style: TextStyle(
+                              color:
+                                  isDarkMode ? Colors.white70 : Colors.black54,
+                              fontSize: 12,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 24),
                           if (isLoading)
@@ -425,6 +487,7 @@ class _OtpTestPageState extends State<OtpTestPage> {
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 16),
                           OtpTextField(
@@ -448,17 +511,22 @@ class _OtpTestPageState extends State<OtpTestPage> {
                             const SizedBox(height: 8),
                             Text(
                               _otpError!,
-                              style: const TextStyle(
-                                color: Colors.red,
+                              style: TextStyle(
+                                color: errorColor,
                                 fontWeight: FontWeight.bold,
+                                fontSize: 14,
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           ],
                           const SizedBox(height: 16),
                           if (isVerifying)
                             const CircularProgressIndicator()
                           else if (isLoading)
-                            Text('ارسال مجدد تا $secondsRemaining ثانیه دیگر')
+                            Text(
+                              'ارسال مجدد تا $secondsRemaining ثانیه دیگر',
+                              textAlign: TextAlign.center,
+                            )
                           else
                             TextButton(
                               onPressed: sendOtp,
