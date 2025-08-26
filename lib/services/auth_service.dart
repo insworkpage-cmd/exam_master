@@ -8,6 +8,7 @@ class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   UserModel? _currentUser;
@@ -53,7 +54,8 @@ class AuthService {
     }
   }
 
-  Future<UserModel> _createUserDocument(User user, {UserRole? role}) async {
+  Future<UserModel> _createUserDocument(User user,
+      {UserRole? role, String? phone}) async {
     Logger.info('Creating new user document for: ${user.uid}');
     // تعیین نقش پیش‌فرض
     UserRole userRole = role ?? UserRole.normaluser;
@@ -61,14 +63,17 @@ class AuthService {
     if (user.email == 'insworkpage@gmail.com') {
       userRole = UserRole.admin;
     }
+
     final userModel = UserModel(
       id: user.uid,
       uid: user.uid,
       role: userRole,
       email: user.email ?? '',
       name: user.displayName ?? '',
+      phone: phone, // اضافه کردن فیلد phone
       createdAt: DateTime.now(),
     );
+
     final docRef = _firestore.collection('users').doc(user.uid);
     await docRef.set(userModel.toMap());
     Logger.info(
@@ -103,7 +108,8 @@ class AuthService {
     String email,
     String password,
     String name, {
-    UserRole? role, // ← اضافه کردن پارامتر نقش
+    UserRole? role,
+    String? phone, // اضافه کردن پارامتر phone
   }) async {
     try {
       _isLoading = true;
@@ -112,10 +118,11 @@ class AuthService {
         password: password,
       );
       await userCredential.user?.updateDisplayName(name);
-      // ایجاد سند کاربر با نقش مشخص شده
+      // ایجاد سند کاربر با نقش و شماره تلفن مشخص شده
       _currentUser = await _createUserDocument(
         userCredential.user!,
-        role: role ?? UserRole.normaluser, // ← نقش پیش‌فرض normaluser
+        role: role ?? UserRole.normaluser,
+        phone: phone,
       );
       _isLoading = false;
       return _currentUser;
@@ -152,24 +159,96 @@ class AuthService {
   Future<void> updateUser(UserModel user) async {
     try {
       Logger.info('Updating user data for: ${user.id}');
-
       // به‌روزرسانی اطلاعات کاربر در Firestore
       await _firestore.collection('users').doc(user.id).update(user.toMap());
-
       // به‌روزرسانی اطلاعات کاربر در Firebase Auth
       final firebaseUser = _auth.currentUser;
       if (firebaseUser != null && firebaseUser.uid == user.id) {
         await firebaseUser.updateDisplayName(user.name);
       }
-
       // به‌روزرسانی کاربر فعلی در حالت محلی
       if (_currentUser?.id == user.id) {
         _currentUser = user;
       }
-
       Logger.info('User data updated successfully');
     } catch (e) {
       Logger.error('Error updating user data: $e');
+      rethrow;
+    }
+  }
+
+  // متد جدید برای دریافت لیست همه کاربران به صورت Stream
+  Stream<List<UserModel>> getUsersStream() {
+    Logger.info('Getting users stream');
+    return _firestore.collection('users').snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id; // اضافه کردن ID به داده‌ها
+        return UserModel.fromMap(data);
+      }).toList();
+    });
+  }
+
+  // متد جدید برای دریافت لیست کاربران به صورت Future
+  Future<List<UserModel>> getAllUsers() async {
+    try {
+      Logger.info('Getting all users');
+      final snapshot = await _firestore.collection('users').get();
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id; // اضافه کردن ID به داده‌ها
+        return UserModel.fromMap(data);
+      }).toList();
+    } catch (e) {
+      Logger.error('Error getting all users: $e');
+      rethrow;
+    }
+  }
+
+  // متد جدید برای حذف کاربر
+  Future<void> deleteUser(String uid) async {
+    try {
+      Logger.info('Deleting user: $uid');
+      // حذف سند کاربر از Firestore
+      await _firestore.collection('users').doc(uid).delete();
+      // اگر کاربر فعلی حذف شده، متغیر محلی رو هم پاک کن
+      if (_currentUser?.uid == uid) {
+        _currentUser = null;
+        // خروج از حساب کاربری اگر کاربر فعلی حذف شده
+        await _auth.signOut();
+      }
+      Logger.info('User deleted successfully');
+    } on FirebaseAuthException catch (e) {
+      Logger.error('Firebase auth error deleting user: ${e.code}');
+      // اگر کاربر در Firebase Auth وجود نداشت، فقط سند رو حذف می‌کنیم
+      if (e.code == 'user-not-found') {
+        await _firestore.collection('users').doc(uid).delete();
+        if (_currentUser?.uid == uid) {
+          _currentUser = null;
+        }
+        Logger.info('User document deleted (user not found in auth)');
+      } else {
+        rethrow;
+      }
+    } catch (e) {
+      Logger.error('Error deleting user: $e');
+      rethrow;
+    }
+  }
+
+  // متد جدید برای به‌روزرسانی اطلاعات کاربر (بدون نیاز به مدل کامل)
+  Future<void> updateUserFields(String uid, Map<String, dynamic> fields) async {
+    try {
+      Logger.info('Updating user fields for: $uid with fields: $fields');
+      // به‌روزرسانی فیلدها در Firestore
+      await _firestore.collection('users').doc(uid).update(fields);
+      // اگر کاربر فعلی هست، اطلاعات محلی رو هم به‌روز کن
+      if (_currentUser?.uid == uid) {
+        _currentUser = await _getUserData(uid);
+      }
+      Logger.info('User fields updated successfully');
+    } catch (e) {
+      Logger.error('Error updating user fields: $e');
       rethrow;
     }
   }
@@ -214,6 +293,28 @@ class AuthService {
       rethrow;
     } catch (e) {
       Logger.error('Unexpected error sending password reset email: $e');
+      rethrow;
+    }
+  }
+
+  // اضافه کردن متد verifyEmail
+  Future<void> verifyEmail() async {
+    try {
+      await _auth.currentUser?.sendEmailVerification();
+      Logger.info('Email verification sent');
+    } catch (e) {
+      Logger.error('Error sending email verification: $e');
+      rethrow;
+    }
+  }
+
+  // اضافه کردن متد resetPassword
+  Future<void> resetPassword(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      Logger.info('Password reset email sent to: $email');
+    } catch (e) {
+      Logger.error('Error sending password reset email: $e');
       rethrow;
     }
   }

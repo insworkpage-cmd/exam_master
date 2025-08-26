@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'; // اضافه شده
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -77,14 +78,36 @@ class ExamMasterApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
+
+          // تنظیمات localizations برای پشتیبانی از زبان فارسی
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+
+          supportedLocales: const [
+            Locale('fa', 'IR'), // فارسی
+            Locale('en', 'US'), // انگلیسی
+          ],
+
+          locale: const Locale('fa', 'IR'), // زبان پیش‌فرض فارسی
+
           onUnknownRoute: (settings) {
             return MaterialPageRoute(
-              builder: (context) => const Scaffold(
-                body: Center(child: Text('صفحه یافت نشد')),
+              builder: (context) => const Directionality(
+                textDirection: TextDirection.rtl,
+                child: Scaffold(
+                  body: Center(
+                    child: Text('صفحه یافت نشد'),
+                  ),
+                ),
               ),
             );
           },
+
           home: const WelcomeScreen(),
+
           routes: {
             // مسیرهای عمومی و کاربران
             '/test-questions': (_) => const QuestionManagementTestPage(),
@@ -94,27 +117,23 @@ class ExamMasterApp extends StatelessWidget {
             '/reset-password': (_) => ResetPasswordPage(),
             '/guest_home': (_) => const GuestHomePage(),
             '/quiz': (_) => const QuizPage(),
-
             // مسیرهای داشبوردها
             '/student_dashboard': (_) => const StudentDashboard(),
             '/instructor_dashboard': (_) => const InstructorDashboard(),
             '/normaluser_dashboard': (_) => const NormalUserDashboard(),
             '/moderator_dashboard': (_) => const ModeratorDashboard(),
             '/admin_dashboard': (_) => const AdminDashboard(),
-
             // مسیرهای مدیریت سوالات
             '/instructor_question_management': (_) =>
                 const QuestionManagementPage(),
             '/moderator_question_approval': (_) => const QuestionApprovalPage(),
-
             // مسیرهای مدیریتی
             '/admin_panel': (_) => const AdminPanelPage(),
-            '/user_management': (_) => const UserManagementPage(),
-            '/class_management': (_) => const ClassManagementPage(),
+            '/user-management': (_) => const UserManagementPage(),
+            '/class-management': (_) => const ClassManagementPage(),
             '/reports': (_) => const ReportsPage(),
-            '/system_monitor': (_) => const SystemMonitorPage(),
+            '/system-monitor': (_) => const SystemMonitorPage(),
             '/settings': (_) => const SettingsPage(),
-
             // مسیرهای استاد
             '/instructor_create_class': (_) => const CreateClassPage(),
             '/instructor_classes': (_) => const InstructorClassListPage(),
@@ -179,95 +198,92 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           return _DashboardRouter(user: authProvider.currentUser!);
         }
 
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Scaffold(
-            backgroundColor: AppTheme.backgroundColor,
-            body: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: AnimatedOpacity(
-                  opacity: _opacity,
-                  duration: const Duration(seconds: 2),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.school,
-                        size: 80,
-                        color: AppTheme.primaryColor,
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'به اپلیکیشن آزمون استخدامی خوش آمدید',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 22,
-                            ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'آیا برای موفقیت در آزمون استخدامی آماده‌اید؟ همین حالا شروع کنید!',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontSize: 16,
-                            ),
-                      ),
-                      const SizedBox(height: 32),
-                      _buildButton(
-                        key: const Key('mobile_login_button'),
-                        icon: Icons.phone_android,
-                        label: 'ورود با شماره موبایل',
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const OtpTestPage()),
-                        ),
-                      ),
-                      _buildButton(
-                        key: const Key('email_login_button'),
-                        icon: Icons.email,
-                        label: 'ورود با ایمیل / رمز عبور',
-                        onPressed: () => Navigator.pushNamed(context, '/login'),
-                      ),
-                      _buildButton(
-                        key: const Key('register_button'),
-                        icon: Icons.person_add_alt_1,
-                        label: 'ثبت‌نام',
-                        onPressed: () =>
-                            Navigator.pushNamed(context, '/register'),
-                      ),
-                      _buildButton(
-                        key: const Key('guest_login_button'),
-                        icon: Icons.person_outline,
-                        label: 'ورود مهمان',
-                        onPressed: () async {
-                          debugPrint('Guest login button pressed');
-                          await authProvider.setGuestMode();
-                          if (!context.mounted) return;
-                          Navigator.pushNamed(context, '/guest_home');
-                        },
-                      ),
-                      const SizedBox(height: 30),
-                      ElevatedButton(
-                        key: const Key('start_quiz_button'),
-                        onPressed: () => Navigator.pushNamed(context, '/quiz'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 32, vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+        return Scaffold(
+          // حذف Directionality از اینجا و اضافه به MaterialApp
+          backgroundColor: AppTheme.backgroundColor,
+          body: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: AnimatedOpacity(
+                opacity: _opacity,
+                duration: const Duration(seconds: 2),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.school,
+                      size: 80,
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'به اپلیکیشن آزمون استخدامی خوش آمدید',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 22,
                           ),
-                        ),
-                        child: const Text(
-                          'شروع آزمون',
-                          style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'آیا برای موفقیت در آزمون استخدامی آماده‌اید؟ همین حالا شروع کنید!',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontSize: 16,
+                          ),
+                    ),
+                    const SizedBox(height: 32),
+                    _buildButton(
+                      key: const Key('mobile_login_button'),
+                      icon: Icons.phone_android,
+                      label: 'ورود با شماره موبایل',
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const OtpTestPage()),
+                      ),
+                    ),
+                    _buildButton(
+                      key: const Key('email_login_button'),
+                      icon: Icons.email,
+                      label: 'ورود با ایمیل / رمز عبور',
+                      onPressed: () => Navigator.pushNamed(context, '/login'),
+                    ),
+                    _buildButton(
+                      key: const Key('register_button'),
+                      icon: Icons.person_add_alt_1,
+                      label: 'ثبت‌نام',
+                      onPressed: () =>
+                          Navigator.pushNamed(context, '/register'),
+                    ),
+                    _buildButton(
+                      key: const Key('guest_login_button'),
+                      icon: Icons.person_outline,
+                      label: 'ورود مهمان',
+                      onPressed: () async {
+                        debugPrint('Guest login button pressed');
+                        await authProvider.setGuestMode();
+                        if (!context.mounted) return;
+                        Navigator.pushNamed(context, '/guest_home');
+                      },
+                    ),
+                    const SizedBox(height: 30),
+                    ElevatedButton(
+                      key: const Key('start_quiz_button'),
+                      onPressed: () => Navigator.pushNamed(context, '/quiz'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 32, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    ],
-                  ),
+                      child: const Text(
+                        'شروع آزمون',
+                        style: TextStyle(fontSize: 16, color: Colors.white),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -332,8 +348,13 @@ class _DashboardRouter extends StatelessWidget {
         return const NormalUserDashboard();
       default:
         debugPrint('No role matched, using default route');
-        return const Scaffold(
-          body: Center(child: Text('داشبورد کاربر')),
+        return const Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: Center(
+              child: Text('داشبورد کاربر'),
+            ),
+          ),
         );
     }
   }

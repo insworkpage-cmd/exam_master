@@ -1,7 +1,6 @@
 name: exam_master
 description: "A new Flutter project."
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
@@ -10,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter  # اضافه شده برای پشتیبانی از زبان‌ها
   shared_preferences: ^2.2.2
   intl: ^0.18.1
   shamsi_date: ^1.0.1
@@ -31,9 +32,11 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   google_sign_in: ^6.2.1
-  provider: ^6.0.5
-  share_plus: ^6.3.0
+  provider: ^6.1.2  # به‌روزرسانی نسخه
+  share_plus: ^7.2.2
   url_launcher: ^6.1.5
+  universal_html: ^2.2.4
+  file_picker: ^6.1.1
 
 dev_dependencies:
   flutter_test:
@@ -46,10 +49,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
+  generate: true  # اضافه شده برای تولید کدهای localizations
+  
   assets:
     - lib/assets/fonts/
-
+  
   fonts:
     - family: Vazirmatn
       fonts:

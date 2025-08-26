@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   UserModel? _currentUser;
   bool _isLoading = false;
   String? _pendingClassId;
@@ -34,30 +32,6 @@ class AuthProvider with ChangeNotifier {
       if (user != null) {
         _currentUser = await _authService.getCurrentUser();
         _userRole = _currentUser?.role;
-
-        if (_userRole == null) {
-          try {
-            final userDoc = await _firestore
-                .collection('users')
-                .doc(_currentUser!.uid)
-                .get();
-            if (userDoc.exists) {
-              final roleData = userDoc.data()?['role'];
-              _userRole = UserRole.values.firstWhere(
-                (role) => role.name == (roleData ?? 'normaluser'),
-                orElse: () => UserRole.normaluser,
-              );
-              _currentUser = _currentUser?.copyWith(role: _userRole);
-            } else {
-              _userRole = UserRole.normaluser;
-              _currentUser = _currentUser?.copyWith(role: _userRole);
-            }
-          } catch (e) {
-            debugPrint('Error reading user role from Firestore: $e');
-            _userRole = UserRole.normaluser;
-            _currentUser = _currentUser?.copyWith(role: _userRole);
-          }
-        }
         debugPrint('Auth state changed. User role: $_userRole');
       } else {
         _currentUser = null;
@@ -74,28 +48,6 @@ class AuthProvider with ChangeNotifier {
     try {
       _currentUser = await _authService.getCurrentUser();
       _userRole = _currentUser?.role;
-
-      if (_userRole == null && _currentUser != null) {
-        try {
-          final userDoc =
-              await _firestore.collection('users').doc(_currentUser!.uid).get();
-          if (userDoc.exists) {
-            final roleData = userDoc.data()?['role'];
-            _userRole = UserRole.values.firstWhere(
-              (role) => role.name == (roleData ?? 'normaluser'),
-              orElse: () => UserRole.normaluser,
-            );
-            _currentUser = _currentUser?.copyWith(role: _userRole);
-          } else {
-            _userRole = UserRole.normaluser;
-            _currentUser = _currentUser?.copyWith(role: _userRole);
-          }
-        } catch (e) {
-          debugPrint('Error reading user role from Firestore: $e');
-          _userRole = UserRole.normaluser;
-          _currentUser = _currentUser?.copyWith(role: _userRole);
-        }
-      }
       debugPrint('Initialized. User role: $_userRole');
     } catch (e) {
       debugPrint('Error initializing auth provider: $e');
@@ -106,8 +58,18 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  bool hasAccess(UserRole requiredRole) {
+    if (_isGuest && requiredRole == UserRole.guest) return true;
+    if (_currentUser == null) return false;
+    return _userRole == requiredRole || _userRole == UserRole.admin;
+  }
+
   Future<void> updateUserRole(UserRole newRole) async {
     if (_currentUser == null) return;
+
+    _isLoading = true;
+    notifyListeners();
+
     try {
       await _authService.updateUserRole(_currentUser!.id, newRole);
       _userRole = newRole;
@@ -117,13 +79,18 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Error updating user role: $e');
       rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
   Future<void> updateUser(UserModel updatedUser) async {
     if (_currentUser == null) return;
+
     _isLoading = true;
     notifyListeners();
+
     try {
       await _authService.updateUser(updatedUser);
       _currentUser = updatedUser;
@@ -139,34 +106,83 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Stream<List<UserModel>> getUsersStream() {
+    return _authService.getUsersStream();
+  }
+
+  Future<List<UserModel>> getAllUsers() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final users = await _authService.getAllUsers();
+      return users;
+    } catch (e) {
+      debugPrint('Error getting all users: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteUser(String userId) async {
+    if (_currentUser?.id == userId) {
+      throw Exception('نمی‌توانید حساب خود را حذف کنید');
+    }
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _authService.deleteUser(userId);
+      debugPrint('User deleted successfully');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error deleting user: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateUserFields(
+      String userId, Map<String, dynamic> fields) async {
+    if (_currentUser == null && userId != _currentUser?.id) {
+      throw Exception('کاربر لاگین نیست یا دسترسی ندارد');
+    }
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _authService.updateUserFields(userId, fields);
+
+      // اگر کاربر فعلی هست، اطلاعات رو به‌روز کن
+      if (_currentUser?.id == userId) {
+        _currentUser = await _authService.getCurrentUser();
+        _userRole = _currentUser?.role;
+      }
+
+      debugPrint('User fields updated successfully');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating user fields: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> signIn(String email, String password) async {
     _isLoading = true;
     notifyListeners();
+
     try {
       _currentUser = await _authService.signIn(email, password);
       _userRole = _currentUser?.role;
-
-      if (_userRole == null) {
-        try {
-          final userDoc =
-              await _firestore.collection('users').doc(_currentUser!.uid).get();
-          if (userDoc.exists) {
-            final roleData = userDoc.data()?['role'];
-            _userRole = UserRole.values.firstWhere(
-              (role) => role.name == (roleData ?? 'normaluser'),
-              orElse: () => UserRole.normaluser,
-            );
-            _currentUser = _currentUser?.copyWith(role: _userRole);
-          } else {
-            _userRole = UserRole.normaluser;
-            _currentUser = _currentUser?.copyWith(role: _userRole);
-          }
-        } catch (e) {
-          debugPrint('Error reading user role from Firestore: $e');
-          _userRole = UserRole.normaluser;
-          _currentUser = _currentUser?.copyWith(role: _userRole);
-        }
-      }
       debugPrint('Signed in. User role: $_userRole');
     } catch (e) {
       debugPrint('Sign in error: $e');
@@ -177,25 +193,25 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> register(String email, String password, String name,
-      {UserRole? role}) async {
+  Future<void> register(
+    String email,
+    String password,
+    String name, {
+    UserRole? role,
+    String? phone, // اضافه کردن پارامتر phone
+  }) async {
     _isLoading = true;
     notifyListeners();
+
     try {
       _currentUser = await _authService.register(
         email,
         password,
         name,
         role: role ?? UserRole.normaluser,
+        phone: phone,
       );
-      await Future.delayed(const Duration(milliseconds: 1500));
-      _currentUser = await _authService.getCurrentUser();
       _userRole = _currentUser?.role;
-
-      if (_userRole == null) {
-        _userRole = role ?? UserRole.normaluser;
-        _currentUser = _currentUser?.copyWith(role: _userRole);
-      }
       debugPrint('Registered. User role: $_userRole');
     } catch (e) {
       debugPrint('Registration error: $e');
@@ -206,60 +222,11 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> autoSignInAfterRegistration(
-      String email, String password) async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      for (int i = 0; i < 5; i++) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        try {
-          _currentUser = await _authService.signIn(email, password);
-          _userRole = _currentUser?.role;
-          if (_currentUser != null) {
-            break;
-          }
-        } catch (e) {
-          debugPrint('Attempt $i failed: $e');
-          if (i == 4) rethrow;
-        }
-      }
-
-      if (_userRole == null) {
-        try {
-          final userDoc =
-              await _firestore.collection('users').doc(_currentUser!.uid).get();
-          if (userDoc.exists) {
-            final roleData = userDoc.data()?['role'];
-            _userRole = UserRole.values.firstWhere(
-              (role) => role.name == (roleData ?? 'normaluser'),
-              orElse: () => UserRole.normaluser,
-            );
-            _currentUser = _currentUser?.copyWith(role: _userRole);
-          } else {
-            _userRole = UserRole.normaluser;
-            _currentUser = _currentUser?.copyWith(role: _userRole);
-          }
-        } catch (e) {
-          debugPrint('Error reading user role from Firestore: $e');
-          _userRole = UserRole.normaluser;
-          _currentUser = _currentUser?.copyWith(role: _userRole);
-        }
-      }
-      debugPrint('Auto sign-in successful. User role: $_userRole');
-    } catch (e) {
-      debugPrint('Auto sign-in error: $e');
-      rethrow;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // متد اصلاح شده برای خروج از حساب کاربری
   Future<void> signOut() async {
     try {
       debugPrint('=== AUTH PROVIDER SIGN OUT STARTED ===');
+      _isLoading = true;
+      notifyListeners();
 
       // پاک کردن SharedPreferences
       final prefs = await SharedPreferences.getInstance();
@@ -284,15 +251,23 @@ class AuthProvider with ChangeNotifier {
       _isGuest = false;
       _pendingClassId = null;
       notifyListeners();
-      rethrow; // پرتاب خطا برای مدیریت در UI
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  Future<void> setGuestMode() async {
+  Future<void> setGuestMode({bool isGuest = true}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isGuest', true);
-    _isGuest = true;
-    _userRole = UserRole.guest;
+    await prefs.setBool('isGuest', isGuest);
+
+    _isGuest = isGuest;
+    if (isGuest) {
+      _userRole = UserRole.guest;
+      _currentUser = null;
+    }
+
     notifyListeners();
   }
 
@@ -300,6 +275,39 @@ class AuthProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('pendingClassId', classId);
     _pendingClassId = classId;
+    notifyListeners();
+  }
+
+  Future<void> verifyEmail() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _authService.verifyEmail();
+      debugPrint('Email verification sent');
+    } catch (e) {
+      debugPrint('Error sending email verification: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> resetPassword(String email) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _authService.resetPassword(email);
+      debugPrint('Password reset email sent');
+    } catch (e) {
+      debugPrint('Error sending password reset email: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> sendPasswordResetEmail(String email) async {
