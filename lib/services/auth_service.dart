@@ -63,7 +63,6 @@ class AuthService {
     if (user.email == 'insworkpage@gmail.com') {
       userRole = UserRole.admin;
     }
-
     final userModel = UserModel(
       id: user.uid,
       uid: user.uid,
@@ -73,7 +72,6 @@ class AuthService {
       phone: phone, // اضافه کردن فیلد phone
       createdAt: DateTime.now(),
     );
-
     final docRef = _firestore.collection('users').doc(user.uid);
     await docRef.set(userModel.toMap());
     Logger.info(
@@ -315,6 +313,80 @@ class AuthService {
       Logger.info('Password reset email sent to: $email');
     } catch (e) {
       Logger.error('Error sending password reset email: $e');
+      rethrow;
+    }
+  }
+
+  // متد جدید برای ارسال ایمیل تأیید برای ادمین اصلی
+  Future<void> sendAdminVerificationEmail() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('هیچ کاربری لاگین نیست');
+      }
+
+      // بررسی اینکه کاربر ادمین اصلی است
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (!userDoc.exists) {
+        throw Exception('اطلاعات کاربر یافت نشد');
+      }
+
+      final userData = userDoc.data()!;
+      if (userData['role'] != 'admin' ||
+          userData['email'] != 'insworkpage@gmail.com') {
+        throw Exception('فقط ادمین اصلی می‌تواند از این قابلیت استفاده کند');
+      }
+
+      await user.sendEmailVerification();
+      Logger.info('Admin verification email sent');
+    } catch (e) {
+      Logger.error('Error sending admin verification email: $e');
+      rethrow;
+    }
+  }
+
+  // متد جدید برای بررسی اینکه آیا کاربر ادمین اصلی است
+  bool get isSuperAdmin {
+    final user = _auth.currentUser;
+    return user?.email == 'insworkpage@gmail.com';
+  }
+
+  // متد جدید برای دریافت پسوردها (اگر نیاز دارید)
+  // توجه: این متد فقط برای ادمین اصلی قابل استفاده است
+  Future<List<Map<String, dynamic>>> getUserPasswords(
+      List<String> userIds) async {
+    try {
+      if (!isSuperAdmin) {
+        throw Exception('فقط ادمین اصلی می‌تواند به پسوردها دسترسی داشته باشد');
+      }
+
+      List<Map<String, dynamic>> passwords = [];
+
+      for (String userId in userIds) {
+        try {
+          // در Firebase Auth، پسوردها مستقیماً قابل دسترسی نیستند
+          // اینجا باید یک راه جایگزین پیاده‌سازی کنید
+          // مثلاً ذخیره پسوردها در یک مجموعه جداگانه با دسترسی محدود
+          final userDoc =
+              await _firestore.collection('users').doc(userId).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data()!;
+            // در اینجا می‌توانید یک فیلد رمز عبور را برگردانید
+            // اما بهتر است رمز عبور را به صورت هش شده ذخیره کنید
+            passwords.add({
+              'userId': userId,
+              'email': userData['email'],
+              'password': '••••••••••', // نمایش ستاره‌دار
+            });
+          }
+        } catch (e) {
+          Logger.error('Error getting password for user $userId: $e');
+        }
+      }
+
+      return passwords;
+    } catch (e) {
+      Logger.error('Error getting user passwords: $e');
       rethrow;
     }
   }
