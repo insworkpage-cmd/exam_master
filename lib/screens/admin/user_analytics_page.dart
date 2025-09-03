@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:syncfusion_flutter_charts/charts.dart' as charts;
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shamsi_date/shamsi_date.dart';
 import 'dart:typed_data';
+import 'dart:async';
+import 'dart:io'; // برای استفاده از SocketException
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../models/user_model.dart';
 import '../../models/user_role.dart';
@@ -39,19 +41,18 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
 
   // متغیرهای صفحه‌بندی جدول کاربران
   int _currentPage = 1;
-  final int _pageSize = 10; // تغییر به final
+  final int _pageSize = 10;
 
   @override
   void initState() {
     super.initState();
-    // استفاده از WidgetsBinding برای اطمینان از ساخت کامل ویجت قبل از بارگذاری داده‌ها
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadAnalyticsData();
     });
   }
 
   Future<void> _loadAnalyticsData() async {
-    if (!mounted) return; // بررسی اینکه ویجت هنوز در درخت ویجت است
+    if (!mounted) return;
 
     setState(() {
       _isLoading = true;
@@ -59,27 +60,43 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
     });
 
     try {
-      // دریافت نسخه از Provider بدون استفاده از setState در حین build
       final authProvider =
           Provider.of<app_auth.AuthProvider>(context, listen: false);
-      final users = await authProvider.getAllUsers();
+      final users = await authProvider.getAllUsers().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('زمان اتصال به سرور تمام شد');
+        },
+      );
 
-      if (!mounted) return; // بررسی مجدد پس از عملیات ناهمگام
+      if (!mounted) return;
 
-      // محاسبه آمار پایه
       _calculateBasicStats(users);
-
-      // محاسبه آمار پیشرفته
       _calculateAdvancedStats(users);
 
-      if (!mounted) return; // بررسی مجدد قبل از setState
+      if (!mounted) return;
 
       setState(() {
         _users = users;
         _isLoading = false;
       });
+    } on TimeoutException catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = 'خطا در اتصال به سرور: ${e.message}';
+        _isLoading = false;
+      });
+    } on SocketException catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage =
+            'خطا در اتصال به اینترنت. لطفاً اتصال خود را بررسی کنید.';
+        _isLoading = false;
+      });
     } catch (e) {
-      if (!mounted) return; // بررسی مجدد قبل از setState
+      if (!mounted) return;
 
       setState(() {
         _errorMessage = 'خطا در بارگذاری داده‌ها: $e';
@@ -90,32 +107,30 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
 
   void _calculateBasicStats(List<UserModel> users) {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final twentyFourHoursAgo = now.subtract(const Duration(hours: 24));
+    final today = DateTime(now.year, now.month, now.day); // امروز ساعت 00:00
+    final oneHourAgo = now.subtract(const Duration(hours: 1)); // یک ساعت پیش
 
     _totalUsers = users.length;
     _onlineUsersCount = 0;
     _todayLoggedInUsersCount = 0;
 
-    // مقداردهی اولیه نقش‌ها
     for (var role in UserRole.values) {
       _usersByRole[role] = 0;
       _onlineUsersByRole[role] = 0;
     }
 
     for (var user in users) {
-      // شمارش کاربران بر اساس نقش
       _usersByRole[user.role] = (_usersByRole[user.role] ?? 0) + 1;
 
-      // محاسبه کاربران آنلاین
       if (user.lastLogin != null) {
-        if (user.lastLogin!.isAfter(twentyFourHoursAgo)) {
+        // محاسبه کاربران آنلاین (فعال در یک ساعت اخیر)
+        if (user.lastLogin!.isAfter(oneHourAgo)) {
           _onlineUsersCount++;
           _onlineUsersByRole[user.role] =
               (_onlineUsersByRole[user.role] ?? 0) + 1;
         }
 
-        // محاسبه کاربران ورود امروز
+        // محاسبه کاربران ورود امروز (از ساعت 00:00 بامداد)
         final loginDate = DateTime(
             user.lastLogin!.year, user.lastLogin!.month, user.lastLogin!.day);
         if (loginDate == today) {
@@ -128,7 +143,6 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
   void _calculateAdvancedStats(List<UserModel> users) {
     _usersByMonth = {};
 
-    // محاسبه کاربران بر اساس ماه
     for (var user in users) {
       final monthKey =
           '${user.createdAt.year}-${user.createdAt.month.toString().padLeft(2, '0')}';
@@ -139,7 +153,6 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
   List<UserModel> _getFilteredUsers() {
     List<UserModel> filteredUsers = List.from(_users);
 
-    // اعمال فیلتر تاریخ
     if (_startDate != null) {
       filteredUsers = filteredUsers
           .where((user) => user.createdAt.isAfter(_startDate!))
@@ -152,7 +165,6 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
           .toList();
     }
 
-    // اعمال فیلتر نقش
     if (_selectedRoles.isNotEmpty) {
       filteredUsers = filteredUsers
           .where((user) => _selectedRoles.contains(user.role))
@@ -174,7 +186,7 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _loadAnalyticsData,
-              tooltip: 'بروزرسانی',
+              tooltip: 'بروزرسانی داده‌ها',
             ),
             PopupMenuButton<String>(
               onSelected: (value) async {
@@ -215,25 +227,30 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _errorMessage.isNotEmpty
-                ? Center(child: Text(_errorMessage))
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(_errorMessage),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadAnalyticsData,
+                          child: const Text('تلاش مجدد'),
+                        ),
+                      ],
+                    ),
+                  )
                 : SingleChildScrollView(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // بخش فیلترها
                         _buildFiltersSection(),
                         const SizedBox(height: 20),
-
-                        // بخش آمار پایه
                         _buildBasicStatsSection(),
                         const SizedBox(height: 20),
-
-                        // بخش نمودارها
                         _buildChartsSection(),
                         const SizedBox(height: 20),
-
-                        // بخش جدول کاربران
                         _buildUsersTable(),
                       ],
                     ),
@@ -246,17 +263,15 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(12.0), // کاهش padding
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'فیلترها',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold), // کاهش اندازه فونت
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12), // کاهش فاصله
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -280,8 +295,8 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                       decoration: const InputDecoration(
                         labelText: 'از تاریخ',
                         border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 8), // کاهش padding
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                       ),
                       child: Text(
                         _startDate != null
@@ -291,13 +306,13 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                           color: _startDate != null
                               ? Colors.black
                               : Colors.grey[600],
-                          fontSize: 12, // کاهش اندازه فونت
+                          fontSize: 12,
                         ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8), // کاهش فاصله
+                const SizedBox(width: 8),
                 Expanded(
                   child: InkWell(
                     onTap: () async {
@@ -319,8 +334,8 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                       decoration: const InputDecoration(
                         labelText: 'تا تاریخ',
                         border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 8), // کاهش padding
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                       ),
                       child: Text(
                         _endDate != null
@@ -330,7 +345,7 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                           color: _endDate != null
                               ? Colors.black
                               : Colors.grey[600],
-                          fontSize: 12, // کاهش اندازه فونت
+                          fontSize: 12,
                         ),
                       ),
                     ),
@@ -338,49 +353,67 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 8), // کاهش فاصله
-            // فیلتر چند انتخابی نقش
+            const SizedBox(height: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'فیلتر نقش‌ها',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold), // کاهش اندازه فونت
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 6), // کاهش فاصله
+                const SizedBox(height: 6),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: UserRole.values.map((role) {
-                    final isSelected = _selectedRoles.contains(role);
-                    return FilterChip(
-                      label: Text(role.persianName,
-                          style: const TextStyle(
-                              fontSize: 10)), // کاهش اندازه فونت
-                      selected: isSelected,
+                  children: [
+                    FilterChip(
+                      label: const Text('انتخاب همه',
+                          style: TextStyle(fontSize: 10)),
+                      selected: _selectedRoles.length == UserRole.values.length,
                       onSelected: (selected) {
                         if (mounted) {
                           setState(() {
                             if (selected) {
-                              _selectedRoles.add(role);
+                              _selectedRoles.addAll(UserRole.values);
                             } else {
-                              _selectedRoles.remove(role);
+                              _selectedRoles.clear();
                             }
                           });
                         }
                       },
-                      selectedColor: _getRoleColor(role).withOpacity(0.2),
-                      checkmarkColor: _getRoleColor(role),
+                      selectedColor: Colors.blue.withOpacity(0.2),
+                      checkmarkColor: Colors.blue,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2), // کاهش padding
-                    );
-                  }).toList(),
+                          horizontal: 6, vertical: 2),
+                    ),
+                    ...UserRole.values.map((role) {
+                      final isSelected = _selectedRoles.contains(role);
+                      return FilterChip(
+                        label: Text(role.persianName,
+                            style: const TextStyle(fontSize: 10)),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          if (mounted) {
+                            setState(() {
+                              if (selected) {
+                                _selectedRoles.add(role);
+                              } else {
+                                _selectedRoles.remove(role);
+                              }
+                            });
+                          }
+                        },
+                        selectedColor: _getRoleColor(role).withOpacity(0.2),
+                        checkmarkColor: _getRoleColor(role),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                      );
+                    }).toList(),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 8), // کاهش فاصله
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -395,11 +428,11 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6), // کاهش padding
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   ),
-                  child: const Text('حذف فیلترها',
-                      style: TextStyle(fontSize: 12)), // کاهش اندازه فونت
+                  child:
+                      const Text('حذف فیلترها', style: TextStyle(fontSize: 12)),
                 ),
               ],
             ),
@@ -410,40 +443,72 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
   }
 
   Widget _buildBasicStatsSection() {
+    // محاسبه اندازه مکعب فعلی
+    final screenWidth = MediaQuery.of(context).size.width;
+    const padding = 32.0; // padding صفحه (16 * 2)
+    const spacing = 36.0; // فاصله بین کارت‌ها (12 * 3)
+    final availableWidth = screenWidth - padding - spacing;
+    final cubeSide = availableWidth / 4; // اندازه ضلع مکعب فعلی
+    final rectangleWidth = cubeSide / 4; // عرض مستطیل جدید (یک‌چهارم ضلع مکعب)
+
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(12.0), // کاهش padding
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'آمار پایه',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold), // کاهش اندازه فونت
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12), // کاهش فاصله
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 4,
-              crossAxisSpacing: 12, // کاهش فاصله
-              mainAxisSpacing: 12, // کاهش فاصله
-              childAspectRatio: 1.0,
-              children: [
-                _buildStatCard(
-                    'کل کاربران', _totalUsers.toString(), Colors.blue),
-                _buildStatCard(
-                    'آنلاین', _onlineUsersCount.toString(), Colors.green),
-                _buildStatCard('ورود امروز',
-                    _todayLoggedInUsersCount.toString(), Colors.orange),
-                _buildStatCard(
-                  'نرخ فعالیت',
-                  '${_totalUsers > 0 ? (_onlineUsersCount / _totalUsers * 100).toStringAsFixed(1) : '0'}%',
-                  Colors.purple,
-                ),
-              ],
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Tooltip(
+                    message: 'تعداد کل کاربران ثبت شده در سیستم',
+                    child: SizedBox(
+                      width: rectangleWidth,
+                      child: _buildStatCard(
+                          'کل کاربران', _totalUsers.toString(), Colors.blue),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Tooltip(
+                    message:
+                        'تعداد کاربرانی که در حال حاضر آنلاین هستند', // اصلاح توضیح
+                    child: SizedBox(
+                      width: rectangleWidth,
+                      child: _buildStatCard(
+                          'آنلاین', _onlineUsersCount.toString(), Colors.green),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Tooltip(
+                    message:
+                        'تعداد کاربرانی که امروز از ساعت 00:00 بامداد وارد سیستم شده‌اند', // اصلاح توضیح
+                    child: SizedBox(
+                      width: rectangleWidth,
+                      child: _buildStatCard('ورود امروز',
+                          _todayLoggedInUsersCount.toString(), Colors.orange),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Tooltip(
+                    message: 'درصد کاربران فعال نسبت به کل کاربران',
+                    child: SizedBox(
+                      width: rectangleWidth,
+                      child: _buildStatCard(
+                        'نرخ فعالیت',
+                        '${_totalUsers > 0 ? (_onlineUsersCount / _totalUsers * 100).toStringAsFixed(1) : '0'}%',
+                        Colors.purple,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -453,7 +518,7 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
 
   Widget _buildStatCard(String title, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.all(6), // کاهش padding
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(6),
@@ -465,16 +530,16 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
           Text(
             title,
             style: TextStyle(
-              fontSize: 10, // کاهش اندازه فونت
+              fontSize: 10,
               color: color,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 2), // کاهش فاصله
+          const SizedBox(height: 2),
           Text(
             value,
             style: TextStyle(
-              fontSize: 16, // کاهش اندازه فونت
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -487,52 +552,45 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
   Widget _buildChartsSection() {
     return Column(
       children: [
-        // نمودار ترکیبی کاربران بر اساس نقش
         Card(
           elevation: 2,
           child: Padding(
-            padding: const EdgeInsets.all(12.0), // کاهش padding
+            padding: const EdgeInsets.all(12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'توزیع کاربران بر اساس نقش',
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold), // کاهش اندازه فونت
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 12), // کاهش فاصله
+                const SizedBox(height: 12),
                 SizedBox(
-                  height: 180, // کاهش ارتفاع
+                  height: 180,
                   child: _buildCombinedRoleChart(),
                 ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 12), // کاهش فاصله
-
-        // ردیف دوم: نمودار رشد ماهانه و نمودار دایره‌ای
+        const SizedBox(height: 12),
         Row(
           children: [
-            // نمودار رشد ماهانه
             Expanded(
               child: Card(
                 elevation: 2,
                 child: Padding(
-                  padding: const EdgeInsets.all(12.0), // کاهش padding
+                  padding: const EdgeInsets.all(12.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
                         'رشد ماهانه کاربران',
                         style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold), // کاهش اندازه فونت
+                            fontSize: 14, fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 12), // کاهش فاصله
+                      const SizedBox(height: 12),
                       SizedBox(
-                        height: 180, // کاهش ارتفاع
+                        height: 180,
                         child: _buildMonthlyGrowthChart(),
                       ),
                     ],
@@ -540,25 +598,23 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                 ),
               ),
             ),
-            const SizedBox(width: 12), // کاهش فاصله
-            // نمودار دایره‌ای
+            const SizedBox(width: 12),
             Expanded(
               child: Card(
                 elevation: 2,
                 child: Padding(
-                  padding: const EdgeInsets.all(12.0), // کاهش padding
+                  padding: const EdgeInsets.all(12.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
                         'توزیع کاربران (نمودار دایره‌ای)',
                         style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold), // کاهش اندازه فونت
+                            fontSize: 14, fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 12), // کاهش فاصله
+                      const SizedBox(height: 12),
                       SizedBox(
-                        height: 180, // کاهش ارتفاع
+                        height: 180,
                         child: _buildPieChart(),
                       ),
                     ],
@@ -573,236 +629,278 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
   }
 
   Widget _buildCombinedRoleChart() {
-    final List<BarChartGroupData> barGroups = [];
+    List<ChartData> chartData = [];
+    List<ChartData> onlineChartData = [];
 
-    for (int i = 0; i < UserRole.values.length; i++) {
-      final role = UserRole.values[i];
-      barGroups.add(
-        BarChartGroupData(
-          x: i, // استفاده از int به جای double
-          barRods: [
-            // میله برای کل کاربران
-            BarChartRodData(
-              toY: (_usersByRole[role] ?? 0).toDouble(),
-              color: _getRoleColor(role).withOpacity(0.7),
-              width: 14, // کاهش عرض
-              borderRadius: BorderRadius.zero,
-            ),
-            // میله برای کاربران آنلاین
-            BarChartRodData(
-              toY: (_onlineUsersByRole[role] ?? 0).toDouble(),
-              color: _getRoleColor(role),
-              width: 14, // کاهش عرض
-              borderRadius: BorderRadius.zero,
-            ),
-          ],
-        ),
-      );
+    for (var role in UserRole.values) {
+      chartData.add(ChartData(role.persianName,
+          (_usersByRole[role] ?? 0).toDouble(), _getRoleColor(role)));
+      onlineChartData.add(ChartData(role.persianName,
+          (_onlineUsersByRole[role] ?? 0).toDouble(), _getRoleColor(role)));
     }
 
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        titlesData: FlTitlesData(
-          show: true,
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index >= 0 && index < UserRole.values.length) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6.0),
-                    child: Text(
-                      UserRole.values[index].persianName,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 9, // کاهش اندازه فونت
-                      ),
-                    ),
-                  );
-                }
-                return const Text('');
-              },
-              reservedSize: 30, // کاهش ارتفاع
-            ),
-          ),
-          leftTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-        ),
-        borderData: FlBorderData(
-          show: false,
-        ),
-        barGroups: barGroups,
-        gridData: const FlGridData(show: false),
+    return charts.SfCartesianChart(
+      primaryXAxis: charts.CategoryAxis(
+        labelStyle: const TextStyle(fontSize: 9),
+        labelRotation: -45,
       ),
+      primaryYAxis: charts.NumericAxis(
+        labelStyle: const TextStyle(fontSize: 9),
+      ),
+      tooltipBehavior: charts.TooltipBehavior(
+        enable: true,
+        header: '',
+        format: 'point.x : point.y کاربر',
+        canShowMarker: true,
+      ),
+      series: <charts.CartesianSeries>[
+        charts.ColumnSeries<ChartData, String>(
+          dataSource: chartData,
+          xValueMapper: (ChartData data, _) => data.x,
+          yValueMapper: (ChartData data, _) => data.y,
+          pointColorMapper: (ChartData data, _) => data.color,
+          name: 'کل کاربران',
+          dataLabelSettings: const charts.DataLabelSettings(isVisible: false),
+          width: 0.4,
+          spacing: 0.2,
+        ),
+        charts.ColumnSeries<ChartData, String>(
+          dataSource: onlineChartData,
+          xValueMapper: (ChartData data, _) => data.x,
+          yValueMapper: (ChartData data, _) => data.y,
+          pointColorMapper: (ChartData data, _) => data.color,
+          name: 'کاربران آنلاین',
+          dataLabelSettings: const charts.DataLabelSettings(isVisible: false),
+          width: 0.4,
+          spacing: 0.2,
+        ),
+      ],
     );
   }
 
   Widget _buildMonthlyGrowthChart() {
-    final sortedMonths = _usersByMonth.keys.toList()..sort();
-    final List<FlSpot> spots = [];
+    List<GrowthData> chartData = [];
 
+    final sortedMonths = _usersByMonth.keys.toList()..sort();
     for (int i = 0; i < sortedMonths.length; i++) {
       final month = sortedMonths[i];
       final parts = month.split('-');
       final monthInt = int.parse(parts[1]);
-      spots.add(FlSpot(
-        monthInt.toDouble(),
-        _usersByMonth[month]!.toDouble(),
-      ));
+      final yearInt = int.parse(parts[0]);
+
+      chartData.add(GrowthData('$monthInt',
+          (_usersByMonth[month] ?? 0).toDouble(), yearInt, monthInt));
     }
 
-    return LineChart(
-      LineChartData(
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: true,
-          getDrawingVerticalLine: (value) {
-            return FlLine(
-              color: Colors.grey.withOpacity(0.2),
-              strokeWidth: 1,
-            );
-          },
-          drawHorizontalLine: true,
-          getDrawingHorizontalLine: (value) {
-            return FlLine(
-              color: Colors.grey.withOpacity(0.2),
-              strokeWidth: 1,
-            );
-          },
-        ),
-        titlesData: FlTitlesData(
-          show: true,
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 24, // کاهش ارتفاع
-              getTitlesWidget: (value, meta) {
-                if (value.toInt() > 0 && value.toInt() <= 12) {
-                  return Text(
-                    '${value.toInt()}',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 9, // کاهش اندازه فونت
-                    ),
-                  );
-                }
-                return const Text('');
-              },
-            ),
-          ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                if (value.toInt() > 0) {
-                  return Text(
-                    '${value.toInt()}',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 9, // کاهش اندازه فونت
-                    ),
-                  );
-                }
-                return const Text('');
-              },
-              reservedSize: 24, // کاهش ارتفاع
-            ),
-          ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-        ),
-        borderData: FlBorderData(
-          show: true,
-          border: Border.all(color: Colors.grey.withOpacity(0.2)),
-        ),
-        minX: 1,
-        maxX: 12,
-        minY: 0,
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            color: Colors.blue,
-            barWidth: 2, // کاهش عرض
-            isStrokeCapRound: true,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) {
-                return FlDotCirclePainter(
-                  radius: 3, // کاهش اندازه
-                  color: Colors.blue,
-                  strokeWidth: 1, // کاهش ضخامت
-                  strokeColor: Colors.white,
-                );
-              },
-            ),
-            belowBarData: BarAreaData(
-              show: true,
-              color: Colors.blue.withOpacity(0.2),
-            ),
-          ),
-        ],
+    return charts.SfCartesianChart(
+      primaryXAxis: charts.CategoryAxis(
+        labelStyle: const TextStyle(fontSize: 9),
+        title: charts.AxisTitle(
+            text: 'ماه', textStyle: const TextStyle(fontSize: 10)),
       ),
+      primaryYAxis: charts.NumericAxis(
+        labelStyle: const TextStyle(fontSize: 9),
+        title: charts.AxisTitle(
+            text: 'تعداد کاربران', textStyle: const TextStyle(fontSize: 10)),
+      ),
+      tooltipBehavior: charts.TooltipBehavior(
+        enable: true,
+        header: '',
+        format: 'ماه point.x: point.y کاربر',
+        canShowMarker: true,
+      ),
+      series: <charts.CartesianSeries>[
+        charts.LineSeries<GrowthData, String>(
+          dataSource: chartData,
+          xValueMapper: (GrowthData data, _) => data.month,
+          yValueMapper: (GrowthData data, _) => data.count,
+          name: 'رشد کاربران',
+          markerSettings: const charts.MarkerSettings(isVisible: true),
+          dataLabelSettings: const charts.DataLabelSettings(isVisible: false),
+          color: Colors.blue,
+          width: 2,
+          animationDuration: 0,
+        ),
+      ],
     );
   }
 
   Widget _buildPieChart() {
-    final List<PieChartSectionData> sections = [];
-    int totalUsers = _usersByRole.values.fold(0, (sum, count) => sum + count);
+    List<PieData> chartData = [];
 
-    // کد اصلاح شده
-// کد اصلاح شده
-    for (int i = 0; i < UserRole.values.length; i++) {
-      final role = UserRole.values[i];
-      final count = _usersByRole[role] ?? 0;
-      final percentage = totalUsers > 0 ? (count / totalUsers) * 100 : 0;
-      // حذف متغیر استفاده نشده
-      // final onlineCount = _onlineUsersByRole[role] ?? 0;
-
-      sections.add(
-        PieChartSectionData(
-          color: _getRoleColor(role),
-          value: count.toDouble(),
-          title: '${percentage.toStringAsFixed(1)}%',
-          radius: 60,
-          titleStyle: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-          badgeWidget: null,
-          badgePositionPercentageOffset: 0,
-        ),
-      );
+    for (var role in UserRole.values) {
+      chartData.add(PieData(
+          role.persianName,
+          (_usersByRole[role] ?? 0).toDouble(),
+          _getRoleColor(role),
+          (_onlineUsersByRole[role] ?? 0),
+          _getTodayLoggedInCountForRole(role)));
     }
 
-    return SizedBox(
-      height: 180, // کاهش ارتفاع
-      child: PieChart(
-        PieChartData(
-          sections: sections,
-          centerSpaceRadius: 25, // کاهش اندازه
-          sectionsSpace: 2,
-          startDegreeOffset: -90,
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: charts.SfCircularChart(
+            tooltipBehavior: charts.TooltipBehavior(
+              enable: true,
+              header: '',
+              format: 'point.x: point.y کاربر',
+              canShowMarker: true,
+            ),
+            legend: const charts.Legend(
+              isVisible: false,
+            ),
+            series: <charts.CircularSeries>[
+              charts.DoughnutSeries<PieData, String>(
+                dataSource: chartData,
+                xValueMapper: (PieData data, _) => data.role,
+                yValueMapper: (PieData data, _) => data.count,
+                pointColorMapper: (PieData data, _) => data.color,
+                dataLabelSettings: const charts.DataLabelSettings(
+                  isVisible: true,
+                  labelPosition: charts.ChartDataLabelPosition.outside,
+                  labelIntersectAction: charts.LabelIntersectAction.shift,
+                  connectorLineSettings: charts.ConnectorLineSettings(
+                    type: charts.ConnectorType.line,
+                    length: '10%',
+                  ),
+                ),
+                radius: '70%',
+                innerRadius: '40%',
+                explode: true,
+                explodeIndex: 0,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          flex: 1,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: UserRole.values.take(3).map((role) {
+                          return _buildRoleDetail(role);
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: UserRole.values.skip(3).map((role) {
+                          return _buildRoleDetail(role);
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleDetail(UserRole role) {
+    final count = _usersByRole[role] ?? 0;
+    final totalUsers = _usersByRole.values.fold(0, (sum, count) => sum + count);
+    final percentage = totalUsers > 0 ? (count / totalUsers) * 100 : 0;
+    final onlineCount = _onlineUsersByRole[role] ?? 0;
+    final onlinePercentage = count > 0 ? (onlineCount / count) * 100 : 0;
+    final todayLoggedInCount = _getTodayLoggedInCountForRole(role);
+
+    return Tooltip(
+      message: '${role.persianName}\n'
+          'کل: $count کاربر (${percentage.toStringAsFixed(1)}%)\n'
+          'آنلاین: $onlineCount کاربر (${onlinePercentage.toStringAsFixed(1)}%)\n'
+          'ورود امروز: $todayLoggedInCount کاربر',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: _getRoleColor(role).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: _getRoleColor(role).withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    color: _getRoleColor(role),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      role.persianName,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'کل: $count',
+                      style: const TextStyle(fontSize: 8),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'آنلاین: $onlineCount',
+                      style: const TextStyle(fontSize: 8),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'امروز: $todayLoggedInCount',
+                      style: const TextStyle(fontSize: 8),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  int _getTodayLoggedInCountForRole(UserRole role) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day); // امروز ساعت 00:00
+
+    return _users.where((user) {
+      return user.role == role &&
+          user.lastLogin != null &&
+          DateTime(user.lastLogin!.year, user.lastLogin!.month,
+                  user.lastLogin!.day) ==
+              today;
+    }).length;
   }
 
   Widget _buildUsersTable() {
@@ -818,7 +916,7 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(12.0), // کاهش padding
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -827,26 +925,22 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
               children: [
                 const Text(
                   'لیست کاربران',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold), // کاهش اندازه فونت
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   'تعداد: ${filteredUsers.length}',
-                  style: const TextStyle(fontSize: 12), // کاهش اندازه فونت
+                  style: const TextStyle(fontSize: 12),
                 ),
               ],
             ),
-            const SizedBox(height: 12), // کاهش فاصله
+            const SizedBox(height: 12),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                columnSpacing: 8, // کاهش فاصله بین ستون‌ها
-                headingRowHeight: 32, // کاهش ارتفاع هدر
-                dataRowMinHeight:
-                    40, // استفاده از dataRowMinHeight به جای dataRowHeight
-                dataRowMaxHeight:
-                    40, // استفاده از dataRowMaxHeight به جای dataRowHeight
+                columnSpacing: 8,
+                headingRowHeight: 32,
+                dataRowMinHeight: 40,
+                dataRowMaxHeight: 40,
                 columns: const [
                   DataColumn(
                       label: Text('نام', style: TextStyle(fontSize: 12))),
@@ -885,13 +979,12 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                 }).toList(),
               ),
             ),
-            const SizedBox(height: 12), // کاهش فاصله
-            // بخش صفحه‌بندی
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, size: 18), // کاهش اندازه
+                  icon: const Icon(Icons.arrow_back, size: 18),
                   onPressed: _currentPage > 1
                       ? () {
                           if (mounted) {
@@ -904,11 +997,10 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                 ),
                 Text(
                   'صفحه $_currentPage از $totalPages',
-                  style: const TextStyle(fontSize: 12), // کاهش اندازه فونت
+                  style: const TextStyle(fontSize: 12),
                 ),
                 IconButton(
-                  icon:
-                      const Icon(Icons.arrow_forward, size: 18), // کاهش اندازه
+                  icon: const Icon(Icons.arrow_forward, size: 18),
                   onPressed: _currentPage < totalPages
                       ? () {
                           if (mounted) {
@@ -928,43 +1020,48 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
   }
 
   Widget _buildStatusIndicator(UserModel user) {
-    final isOnline = user.lastLogin != null &&
-        user.lastLogin!
-            .isAfter(DateTime.now().subtract(const Duration(hours: 1)));
+    final now = DateTime.now();
+    final oneHourAgo = now.subtract(const Duration(hours: 1)); // یک ساعت پیش
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 6, // کاهش اندازه
-          height: 6, // کاهش اندازه
-          decoration: BoxDecoration(
-            color: isOnline ? Colors.green : Colors.grey,
-            shape: BoxShape.circle,
+    final isOnline =
+        user.lastLogin != null && user.lastLogin!.isAfter(oneHourAgo);
+
+    return Tooltip(
+      message: isOnline
+          ? 'کاربر آنلاین است\nآخرین فعالیت: ${_formatJalaliDate(user.lastLogin!)}'
+          : 'کاربر آفلاین است\nآخرین فعالیت: ${user.lastLogin != null ? _formatJalaliDate(user.lastLogin!) : 'ثبت نشده'}',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: isOnline ? Colors.green : Colors.grey,
+              shape: BoxShape.circle,
+            ),
           ),
-        ),
-        const SizedBox(width: 3), // کاهش فاصله
-        Text(
-          isOnline ? 'آنلاین' : 'آفلاین',
-          style: TextStyle(
-            fontSize: 10, // کاهش اندازه فونت
-            color: isOnline ? Colors.green : Colors.grey,
+          const SizedBox(width: 3),
+          Text(
+            isOnline ? 'آنلاین' : 'آفلاین',
+            style: TextStyle(
+              fontSize: 10,
+              color: isOnline ? Colors.green : Colors.grey,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Future<void> _exportToPDF() async {
     final pdf = pw.Document();
 
-    // بارگذاری فونت‌های دستی
     final ByteData regularFontData =
         await rootBundle.load('lib/assets/fonts/Vazirmatn-Regular.ttf');
     final ByteData boldFontData =
         await rootBundle.load('lib/assets/fonts/Vazirmatn-Bold.ttf');
 
-    // ایجاد فونت با استفاده از ByteData
     final pw.Font regularFont = pw.Font.ttf(regularFontData);
     final pw.Font boldFont = pw.Font.ttf(boldFontData);
 
@@ -987,8 +1084,6 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
               pw.Text('تاریخ گزارش: ${_formatJalaliDate(DateTime.now())}',
                   style: pw.TextStyle(font: regularFont, fontSize: 12)),
               pw.SizedBox(height: 20),
-
-              // بخش آمار پایه
               pw.Text('آمار پایه',
                   style: pw.TextStyle(font: boldFont, fontSize: 16)),
               pw.SizedBox(height: 10),
@@ -1012,19 +1107,18 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                 cellPadding: const pw.EdgeInsets.all(5),
               ),
               pw.SizedBox(height: 20),
-
-              // بخش توزیع بر اساس نقش
               pw.Text('توزیع کاربران بر اساس نقش',
                   style: pw.TextStyle(font: boldFont, fontSize: 16)),
               pw.SizedBox(height: 10),
               pw.TableHelper.fromTextArray(
                 context: context,
                 data: [
-                  ['نقش', 'تعداد کل', 'آنلاین'],
+                  ['نقش', 'تعداد کل', 'آنلاین', 'ورود امروز'],
                   ...UserRole.values.map((role) => [
                         role.persianName,
                         (_usersByRole[role] ?? 0).toString(),
                         (_onlineUsersByRole[role] ?? 0).toString(),
+                        _getTodayLoggedInCountForRole(role).toString(),
                       ]),
                 ],
                 headerStyle: pw.TextStyle(font: boldFont, fontSize: 12),
@@ -1035,8 +1129,11 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
                 cellPadding: const pw.EdgeInsets.all(5),
               ),
               pw.SizedBox(height: 20),
-
-              // بخش لیست کاربران
+              pw.Text('نمودار توزیع کاربران',
+                  style: pw.TextStyle(font: boldFont, fontSize: 16)),
+              pw.SizedBox(height: 10),
+              _buildPieChartForPDF(pdf, regularFont, boldFont),
+              pw.SizedBox(height: 20),
               pw.Text('لیست کاربران',
                   style: pw.TextStyle(font: boldFont, fontSize: 16)),
               pw.SizedBox(height: 10),
@@ -1067,23 +1164,133 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
       ),
     );
 
-    // ذخیره فایل
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
       name: 'user_analytics_${DateTime.now().millisecondsSinceEpoch}',
     );
   }
 
+  pw.Widget _buildPieChartForPDF(
+      pw.Document pdf, pw.Font regularFont, pw.Font boldFont) {
+    final totalUsers = _usersByRole.values.fold(0, (sum, count) => sum + count);
+    return pw.SizedBox(
+      height: 200,
+      child: pw.Row(
+        children: [
+          pw.Expanded(
+            flex: 2,
+            child: pw.Column(
+              children: [
+                pw.Expanded(
+                  child: pw.Center(
+                    child: pw.Text(
+                      'نمودار دایره‌ای در اینجا نمایش داده می‌شود',
+                      style: pw.TextStyle(font: regularFont, fontSize: 12),
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Container(
+                  height: 100,
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColors.grey200,
+                    borderRadius: pw.BorderRadius.all(pw.Radius.circular(8)),
+                  ),
+                  child: pw.Center(
+                    child: pw.Text(
+                      'نمودار دایره‌ای',
+                      style: pw.TextStyle(font: boldFont, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.Expanded(
+            flex: 1,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: UserRole.values.map((role) {
+                final count = _usersByRole[role] ?? 0;
+                final percentage =
+                    totalUsers > 0 ? (count / totalUsers) * 100 : 0;
+                final onlineCount = _onlineUsersByRole[role] ?? 0;
+                final onlinePercentage =
+                    count > 0 ? (onlineCount / count) * 100 : 0;
+                final todayLoggedInCount = _getTodayLoggedInCountForRole(role);
+                return pw.Container(
+                  margin: const pw.EdgeInsets.all(2),
+                  padding: const pw.EdgeInsets.all(4),
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColors.grey100,
+                    borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Row(
+                        children: [
+                          pw.Container(
+                            width: 8,
+                            height: 8,
+                            color: _getPdfColor(role),
+                          ),
+                          pw.SizedBox(width: 4),
+                          pw.Text(
+                            role.persianName,
+                            style: pw.TextStyle(font: boldFont, fontSize: 10),
+                          ),
+                        ],
+                      ),
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        'کل: $count نفر (${percentage.toStringAsFixed(1)}%)',
+                        style: pw.TextStyle(font: regularFont, fontSize: 8),
+                      ),
+                      pw.Text(
+                        'آنلاین: $onlineCount نفر (${onlinePercentage.toStringAsFixed(1)}%)',
+                        style: pw.TextStyle(font: regularFont, fontSize: 8),
+                      ),
+                      pw.Text(
+                        'ورود امروز: $todayLoggedInCount نفر',
+                        style: pw.TextStyle(font: regularFont, fontSize: 8),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  PdfColor _getPdfColor(UserRole role) {
+    switch (role) {
+      case UserRole.admin:
+        return PdfColors.red;
+      case UserRole.moderator:
+        return PdfColors.orange;
+      case UserRole.instructor:
+        return PdfColors.green;
+      case UserRole.student:
+        return PdfColors.blue;
+      case UserRole.normaluser:
+        return PdfColors.grey;
+      default:
+        return PdfColors.grey;
+    }
+  }
+
   Future<void> _printReport() async {
     final pdf = pw.Document();
 
-    // بارگذاری فونت‌های دستی
     final ByteData regularFontData =
         await rootBundle.load('lib/assets/fonts/Vazirmatn-Regular.ttf');
     final ByteData boldFontData =
         await rootBundle.load('lib/assets/fonts/Vazirmatn-Bold.ttf');
 
-    // ایجاد فونت با استفاده از ByteData
     final pw.Font regularFont = pw.Font.ttf(regularFontData);
     final pw.Font boldFont = pw.Font.ttf(boldFontData);
 
@@ -1106,8 +1313,6 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
               pw.Text('تاریخ گزارش: ${_formatJalaliDate(DateTime.now())}',
                   style: pw.TextStyle(font: regularFont, fontSize: 12)),
               pw.SizedBox(height: 20),
-
-              // بخش آمار پایه
               pw.Text('آمار پایه',
                   style: pw.TextStyle(font: boldFont, fontSize: 16)),
               pw.SizedBox(height: 10),
@@ -1136,7 +1341,6 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
       ),
     );
 
-    // چاپ مستقیم با استفاده از متد جدید
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
       name: 'user_analytics_${DateTime.now().millisecondsSinceEpoch}',
@@ -1168,4 +1372,33 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
         return Colors.grey;
     }
   }
+}
+
+// کلاس‌های کمکی برای نمودارها
+class ChartData {
+  final String x;
+  final double y;
+  final Color color;
+
+  ChartData(this.x, this.y, this.color);
+}
+
+class GrowthData {
+  final String month;
+  final double count;
+  final int year;
+  final int monthNumber;
+
+  GrowthData(this.month, this.count, this.year, this.monthNumber);
+}
+
+class PieData {
+  final String role;
+  final double count;
+  final Color color;
+  final int onlineCount;
+  final int todayLoggedInCount;
+
+  PieData(this.role, this.count, this.color, this.onlineCount,
+      this.todayLoggedInCount);
 }

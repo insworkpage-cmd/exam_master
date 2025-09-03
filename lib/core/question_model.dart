@@ -9,12 +9,19 @@ class Question {
   final String? explanation;
   final String? instructorId;
   final String status;
-  final DateTime createdAt; // ← اضافه شد
-  final DateTime? updatedAt; // ← اضافه شد
-  final String? category; // ← اضافه شد
-  final int difficulty; // ← اضافه شد
-  final int? timeLimit; // ← اضافه شد
-  final List<String>? tags; // ← اضافه شد
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final String? category;
+  final int difficulty;
+  final int? timeLimit;
+  final List<String>? tags;
+
+  // فیلدهای جدید برای نیازمندی‌های جدید
+  final String? classId; // ← اضافه شد
+  final String? proposedBy; // ← اضافه شد
+  final String? reviewedBy; // ← اضافه شد
+  final DateTime? reviewDate; // ← اضافه شد
+  final String? reviewComment; // ← اضافه شد
 
   Question({
     required this.id,
@@ -25,15 +32,21 @@ class Question {
     this.explanation,
     this.instructorId,
     this.status = 'pending',
-    required this.createdAt, // ← الزامی شد
-    this.updatedAt, // ← اضافه شد
-    this.category, // ← اضافه شد
-    this.difficulty = 1, // ← اضافه شد با مقدار پیش‌فرض
-    this.timeLimit, // ← اضافه شد
-    this.tags, // ← اضافه شد
+    required this.createdAt,
+    this.updatedAt,
+    this.category,
+    this.difficulty = 1,
+    this.timeLimit,
+    this.tags,
+    // فیلدهای جدید
+    this.classId, // ← اضافه شد
+    this.proposedBy, // ← اضافه شد
+    this.reviewedBy, // ← اضافه شد
+    this.reviewDate, // ← اضافه شد
+    this.reviewComment, // ← اضافه شد
   });
 
-  // متد copyWith کامل‌تر
+  // متد copyWith کامل‌تر با فیلدهای جدید
   Question copyWith({
     String? id,
     String? text,
@@ -49,6 +62,12 @@ class Question {
     int? difficulty,
     int? timeLimit,
     List<String>? tags,
+    // فیلدهای جدید
+    String? classId, // ← اضافه شد
+    String? proposedBy, // ← اضافه شد
+    String? reviewedBy, // ← اضافه شد
+    DateTime? reviewDate, // ← اضافه شد
+    String? reviewComment, // ← اضافه شد
   }) {
     return Question(
       id: id ?? this.id,
@@ -65,6 +84,12 @@ class Question {
       difficulty: difficulty ?? this.difficulty,
       timeLimit: timeLimit ?? this.timeLimit,
       tags: tags ?? this.tags,
+      // فیلدهای جدید
+      classId: classId ?? this.classId, // ← اضافه شد
+      proposedBy: proposedBy ?? this.proposedBy, // ← اضافه شد
+      reviewedBy: reviewedBy ?? this.reviewedBy, // ← اضافه شد
+      reviewDate: reviewDate ?? this.reviewDate, // ← اضافه شد
+      reviewComment: reviewComment ?? this.reviewComment, // ← اضافه شد
     );
   }
 
@@ -79,12 +104,18 @@ class Question {
       'explanation': explanation,
       'instructorId': instructorId,
       'status': status,
-      'createdAt': createdAt.toIso8601String(), // ← تبدیل به رشته
-      'updatedAt': updatedAt?.toIso8601String(), // ← تبدیل به رشته
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
       'category': category,
       'difficulty': difficulty,
       'timeLimit': timeLimit,
       'tags': tags ?? [],
+      // فیلدهای جدید
+      'classId': classId, // ← اضافه شد
+      'proposedBy': proposedBy, // ← اضافه شد
+      'reviewedBy': reviewedBy, // ← اضافه شد
+      'reviewDate': reviewDate?.toIso8601String(), // ← اضافه شد
+      'reviewComment': reviewComment, // ← اضافه شد
     };
   }
 
@@ -99,15 +130,21 @@ class Question {
       explanation: map['explanation'],
       instructorId: map['instructorId'],
       status: map['status'] ?? 'pending',
-      createdAt: DateTime.tryParse(map['createdAt'] ?? '') ??
-          DateTime.now(), // ← مدیریت خطا
-      updatedAt: map['updatedAt'] != null
-          ? DateTime.tryParse(map['updatedAt'])
-          : null, // ← مدیریت خطا
+      createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
+      updatedAt:
+          map['updatedAt'] != null ? DateTime.tryParse(map['updatedAt']) : null,
       category: map['category'],
       difficulty: map['difficulty'] ?? 1,
       timeLimit: map['timeLimit'],
       tags: List<String>.from(map['tags'] ?? []),
+      // فیلدهای جدید
+      classId: map['classId'], // ← اضافه شد
+      proposedBy: map['proposedBy'], // ← اضافه شد
+      reviewedBy: map['reviewedBy'], // ← اضافه شد
+      reviewDate: map['reviewDate'] != null
+          ? DateTime.tryParse(map['reviewDate'])
+          : null, // ← اضافه شد
+      reviewComment: map['reviewComment'], // ← اضافه شد
     );
   }
 
@@ -120,7 +157,7 @@ class Question {
   Question copyWithStatus(String newStatus) {
     return copyWith(
       status: newStatus,
-      updatedAt: DateTime.now(), // ← به‌روزرسانی زمان تغییر
+      updatedAt: DateTime.now(),
     );
   }
 
@@ -208,7 +245,7 @@ class Question {
   // متد کمکی برای کلون کردن سوال
   Question clone() {
     return Question(
-      id: const Uuid().v4(), // ← نیاز به import 'package:uuid/uuid.dart'
+      id: const Uuid().v4(),
       text: text,
       options: List<String>.from(options),
       correctAnswerIndex: correctAnswerIndex,
@@ -221,6 +258,72 @@ class Question {
       difficulty: difficulty,
       timeLimit: timeLimit,
       tags: tags,
+      // فیلدهای جدید
+      classId: classId, // ← اضافه شد
+      proposedBy: proposedBy, // ← اضافه شد
+      reviewedBy: null, // ← ریست شود
+      reviewDate: null, // ← ریست شود
+      reviewComment: null, // ← ریست شود
+    );
+  }
+
+  // === متدهای جدید برای نیازمندی‌های جدید ===
+
+  // متدهای کمکی برای نوع سوال
+  bool get isClassQuestion => classId != null; // ← اضافه شد
+  bool get isPublicQuestion => classId == null; // ← اضافه شد
+
+  // متدهای کمکی برای پیشنهاد سوال
+  bool get isProposedByUser => proposedBy != null; // ← اضافه شد
+  bool get isCreatedByInstructor => instructorId != null; // ← اضافه شد
+
+  // متد کمکی برای بررسی نیاز به تایید
+  bool get needsApproval => isPublicQuestion && isPending; // ← اضافه شد
+
+  // متد کمکی برای بررسی قابلیت نمایش عمومی
+  bool get isPubliclyVisible =>
+      isApproved || (isClassQuestion && instructorId != null); // ← اضافه شد
+
+  // متد کمکی برای بررسی دسترسی ویرایش
+  bool canBeEditedBy(String userId, String userRole) {
+    // ← اضافه شد
+    if (userRole == 'admin') return true;
+    if (userRole == 'moderator' && isPending) return true;
+    if (isClassQuestion && instructorId == userId) return true;
+    if (isProposedByUser && proposedBy == userId && isPending) return true;
+    return false;
+  }
+
+  // متد کمکی برای بررسی دسترسی حذف
+  bool canBeDeletedBy(String userId, String userRole) {
+    // ← اضافه شد
+    if (userRole == 'admin') return true;
+    if (isClassQuestion && instructorId == userId) return true;
+    if (isProposedByUser && proposedBy == userId && isPending) return true;
+    return false;
+  }
+
+  // متد کمکی برای تایید سوال
+  Question approve(String moderatorId, {String? comment}) {
+    // ← اضافه شد
+    return copyWith(
+      status: 'approved',
+      reviewedBy: moderatorId,
+      reviewDate: DateTime.now(),
+      reviewComment: comment,
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  // متد کمکی برای رد سوال
+  Question reject(String moderatorId, String comment) {
+    // ← اضافه شد
+    return copyWith(
+      status: 'rejected',
+      reviewedBy: moderatorId,
+      reviewDate: DateTime.now(),
+      reviewComment: comment,
+      updatedAt: DateTime.now(),
     );
   }
 

@@ -2,7 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
-import 'package:shamsi_date/shamsi_date.dart'; // اضافه کردن برای تاریخ شمسی
+import 'package:shamsi_date/shamsi_date.dart';
 import 'user_role.dart';
 
 class UserModel extends Equatable {
@@ -16,6 +16,13 @@ class UserModel extends Equatable {
   final bool isActive;
   final String? phone;
 
+  // فیلدهای جدید برای سیستم مدیریت ظرفیت پیشنهاد سوال
+  final int questionProposalCapacity; // ← اضافه شد
+  final DateTime? lastProposalDate; // ← اضافه شد
+  final bool isProposalBlocked; // ← اضافه شد
+  final DateTime? proposalBlockedAt; // ← اضافه شد
+  final DateTime? proposalUnblockedAt; // ← اضافه شد
+
   const UserModel({
     required this.id,
     required this.uid,
@@ -26,6 +33,12 @@ class UserModel extends Equatable {
     this.lastLogin,
     this.isActive = true,
     this.phone,
+    // فیلدهای جدید با مقادیر پیش‌فرض
+    this.questionProposalCapacity = 10, // ← اضافه شد
+    this.lastProposalDate, // ← اضافه شد
+    this.isProposalBlocked = false, // ← اضافه شد
+    this.proposalBlockedAt, // ← اضافه شد
+    this.proposalUnblockedAt, // ← اضافه شد
   });
 
   UserModel copyWith({
@@ -38,6 +51,12 @@ class UserModel extends Equatable {
     DateTime? lastLogin,
     bool? isActive,
     String? phone,
+    // فیلدهای جدید
+    int? questionProposalCapacity, // ← اضافه شد
+    DateTime? lastProposalDate, // ← اضافه شد
+    bool? isProposalBlocked, // ← اضافه شد
+    DateTime? proposalBlockedAt, // ← اضافه شد
+    DateTime? proposalUnblockedAt, // ← اضافه شد
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -49,6 +68,16 @@ class UserModel extends Equatable {
       lastLogin: lastLogin ?? this.lastLogin,
       isActive: isActive ?? this.isActive,
       phone: phone ?? this.phone,
+      // فیلدهای جدید
+      questionProposalCapacity: questionProposalCapacity ??
+          this.questionProposalCapacity, // ← اضافه شد
+      lastProposalDate: lastProposalDate ?? this.lastProposalDate, // ← اضافه شد
+      isProposalBlocked:
+          isProposalBlocked ?? this.isProposalBlocked, // ← اضافه شد
+      proposalBlockedAt:
+          proposalBlockedAt ?? this.proposalBlockedAt, // ← اضافه شد
+      proposalUnblockedAt:
+          proposalUnblockedAt ?? this.proposalUnblockedAt, // ← اضافه شد
     );
   }
 
@@ -59,11 +88,16 @@ class UserModel extends Equatable {
       'role': role.name,
       'email': email,
       'name': name,
-      'createdAt':
-          createdAt, // Firestore به طور خودکار DateTime را به Timestamp تبدیل می‌کند
-      'lastLogin': lastLogin, // همین‌جا هم همین‌طور
+      'createdAt': createdAt,
+      'lastLogin': lastLogin,
       'isActive': isActive,
       'phone': phone,
+      // فیلدهای جدید
+      'questionProposalCapacity': questionProposalCapacity, // ← اضافه شد
+      'lastProposalDate': lastProposalDate, // ← اضافه شد
+      'isProposalBlocked': isProposalBlocked, // ← اضافه شد
+      'proposalBlockedAt': proposalBlockedAt, // ← اضافه شد
+      'proposalUnblockedAt': proposalUnblockedAt, // ← اضافه شد
     };
   }
 
@@ -83,6 +117,14 @@ class UserModel extends Equatable {
       lastLogin: _parseDateTime(map['lastLogin']),
       isActive: map['isActive'] ?? true,
       phone: map['phone'],
+      // فیلدهای جدید
+      questionProposalCapacity:
+          map['questionProposalCapacity'] ?? 10, // ← اضافه شد
+      lastProposalDate: _parseDateTime(map['lastProposalDate']), // ← اضافه شد
+      isProposalBlocked: map['isProposalBlocked'] ?? false, // ← اضافه شد
+      proposalBlockedAt: _parseDateTime(map['proposalBlockedAt']), // ← اضافه شد
+      proposalUnblockedAt:
+          _parseDateTime(map['proposalUnblockedAt']), // ← اضافه شد
     );
   }
 
@@ -211,6 +253,79 @@ class UserModel extends Equatable {
     return email;
   }
 
+  // === متدهای جدید برای سیستم مدیریت ظرفیت پیشنهاد سوال ===
+
+  // متد کمکی برای نمایش وضعیت پیشنهاد سوال
+  String get proposalStatusText {
+    // ← اضافه شد
+    if (isProposalBlocked) {
+      return 'مسدود شده';
+    }
+    if (questionProposalCapacity <= 0) {
+      return 'ظرفیت تمام شده';
+    }
+    return 'فعال';
+  }
+
+  // متد کمکی برای نمایش رنگ وضعیت پیشنهاد سوال
+  String get proposalStatusColor {
+    // ← اضافه شد
+    if (isProposalBlocked) {
+      return 'red';
+    }
+    if (questionProposalCapacity <= 0) {
+      return 'orange';
+    }
+    return 'green';
+  }
+
+  // متد کمکی برای نمایش متن ظرفیت
+  String get capacityText {
+    // ← اضافه شد
+    return '$questionProposalCapacity از 10';
+  }
+
+  // متد کمکی برای بررسی آیا کاربر می‌تواند سوال پیشنهاد دهد
+  bool get canProposeQuestion {
+    // ← اضافه شد
+    return !isProposalBlocked && questionProposalCapacity > 0;
+  }
+
+  // متد کمکی برای کاهش ظرفیت
+  UserModel decreaseProposalCapacity() {
+    // ← اضافه شد
+    return copyWith(
+      questionProposalCapacity: questionProposalCapacity - 1,
+      lastProposalDate: DateTime.now(),
+    );
+  }
+
+  // متد کمکی برای افزایش ظرفیت
+  UserModel increaseProposalCapacity(int amount) {
+    // ← اضافه شد
+    return copyWith(
+      questionProposalCapacity: questionProposalCapacity + amount,
+    );
+  }
+
+  // متد کمکی برای مسدود کردن پیشنهاد سوال
+  UserModel blockProposalService() {
+    // ← اضافه شد
+    return copyWith(
+      isProposalBlocked: true,
+      proposalBlockedAt: DateTime.now(),
+    );
+  }
+
+  // متد کمکی برای رفع مسدودی پیشنهاد سوال
+  UserModel unblockProposalService() {
+    // ← اضافه شد
+    return copyWith(
+      isProposalBlocked: false,
+      proposalUnblockedAt: DateTime.now(),
+    );
+  }
+
   @override
   List<Object?> get props => [
         id,
@@ -222,5 +337,11 @@ class UserModel extends Equatable {
         lastLogin,
         isActive,
         phone,
+        // فیلدهای جدید
+        questionProposalCapacity, // ← اضافه شد
+        lastProposalDate, // ← اضافه شد
+        isProposalBlocked, // ← اضافه شد
+        proposalBlockedAt, // ← اضافه شد
+        proposalUnblockedAt, // ← اضافه شد
       ];
 }

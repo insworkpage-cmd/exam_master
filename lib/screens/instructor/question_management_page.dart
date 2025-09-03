@@ -10,7 +10,6 @@ import 'package:uuid/uuid.dart';
 
 class QuestionManagementPage extends StatefulWidget {
   const QuestionManagementPage({super.key});
-
   @override
   State<QuestionManagementPage> createState() => _QuestionManagementPageState();
 }
@@ -88,7 +87,6 @@ class _QuestionManagementPageState extends State<QuestionManagementPage> {
     try {
       final authProvider =
           Provider.of<app_auth.AuthProvider>(context, listen: false);
-
       if (authProvider.currentUser == null) {
         throw Exception('کاربر وارد نشده است');
       }
@@ -177,11 +175,11 @@ class _QuestionManagementPageState extends State<QuestionManagementPage> {
     final filteredQuestions = _getFilteredAndSortedQuestions();
 
     return Consumer<app_auth.AuthProvider>(
-      // ← اصلاح Consumer
       builder: (context, authProvider, child) {
         if (authProvider.currentUser == null) {
           return const Center(child: Text('لطفاً وارد شوید'));
         }
+
         return RoleBasedAccess(
           requiredRole: UserRole.instructor,
           child: Scaffold(
@@ -468,14 +466,16 @@ class _QuestionManagementPageState extends State<QuestionManagementPage> {
     );
   }
 
+  // اصلاح شده: استفاده از پارامترهای نامگذاری شده
   Future<void> _addQuestion() async {
     await showDialog(
       context: context,
       builder: (context) => QuestionFormDialog(
         onSubmit: (question) async {
           try {
-            final questionService = QuestionService(); // ← ایجاد instance
-            await questionService.addQuestion(question);
+            final questionService = QuestionService();
+            // اصلاح شده: استفاده از پارامترهای نامگذاری شده
+            await questionService.addQuestion(question: question);
             _showSuccess('سوال با موفقیت اضافه شد');
             _loadQuestions();
           } catch (e) {
@@ -493,7 +493,7 @@ class _QuestionManagementPageState extends State<QuestionManagementPage> {
         question: question,
         onSubmit: (updatedQuestion) async {
           try {
-            final questionService = QuestionService(); // ← ایجاد instance
+            final questionService = QuestionService();
             await questionService.updateQuestion(updatedQuestion);
             _showSuccess('سوال با موفقیت ویرایش شد');
             _loadQuestions();
@@ -526,7 +526,7 @@ class _QuestionManagementPageState extends State<QuestionManagementPage> {
 
     if (confirmed == true) {
       try {
-        final questionService = QuestionService(); // ← ایجاد instance
+        final questionService = QuestionService();
         await questionService.deleteQuestion(questionId);
         _showSuccess('سوال با موفقیت حذف شد');
         _loadQuestions();
@@ -649,14 +649,14 @@ class _QuestionManagementPageState extends State<QuestionManagementPage> {
 class QuestionCard extends StatelessWidget {
   final Question question;
   final VoidCallback onEdit;
-  final VoidCallback onDelete; // ← اضافه شد
+  final VoidCallback onDelete;
   final VoidCallback onViewDetails;
 
   const QuestionCard({
     super.key,
     required this.question,
     required this.onEdit,
-    required this.onDelete, // ← اضافه شد
+    required this.onDelete,
     required this.onViewDetails,
   });
 
@@ -747,7 +747,7 @@ class QuestionCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   TextButton.icon(
-                    onPressed: onDelete, // ← اصلاح شد
+                    onPressed: onDelete,
                     icon: const Icon(Icons.delete, size: 18),
                     label: const Text('حذف'),
                     style: TextButton.styleFrom(
@@ -922,6 +922,7 @@ class _QuestionFormDialogState extends State<QuestionFormDialog> {
     );
   }
 
+  // اصلاح شده: استفاده از سازنده جدید Question
   void _submitForm() {
     if (!_formKey.currentState!.validate()) return;
 
@@ -941,6 +942,17 @@ class _QuestionFormDialogState extends State<QuestionFormDialog> {
           ?.uid,
       status: widget.question?.status ?? 'pending',
       createdAt: widget.question?.createdAt ?? DateTime.now(),
+      // فیلدهای جدید با مقادیر پیش‌فرض
+      category: null,
+      difficulty: 1,
+      timeLimit: null,
+      tags: null,
+      classId: null,
+      proposedBy: null,
+      reviewedBy: null,
+      reviewDate: null,
+      reviewComment: null,
+      updatedAt: widget.question != null ? DateTime.now() : null,
     );
 
     widget.onSubmit(question);

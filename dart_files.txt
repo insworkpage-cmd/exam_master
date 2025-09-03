@@ -23,6 +23,7 @@ E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\admin\expo
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\admin\reports_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\admin\settings_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\admin\system_monitor_page.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\admin\user_analytics_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\admin\user_management_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\auth\email_login_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\auth\register_page.dart
@@ -36,6 +37,10 @@ E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\instructor
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\instructor\instructor_dashboard.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\instructor\question_management_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\moderator\question_approval_page.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\normal_user\create_ticket_page.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\normal_user\propose_question_page.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\normal_user\ticket_detail_page.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\normal_user\ticket_list_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\otp\otp_test_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\profile\user_profile_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\quiz\quiz_page.dart
@@ -46,12 +51,15 @@ E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\student\st
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\screens\test\question_management_test_page.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\analytics_service.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\auth_service.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\capacity_service.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\export_service.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\gamification_service.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\proposal_service.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\question_service.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\report_service.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\role_manager.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\theme_service.dart
+E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\services\ticket_service.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\theme\app_theme.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\utils\dashboard_router.dart
 E:\prgmcod\Testbank_App\flutter_application_1\exam_master\lib\utils\logger.dart

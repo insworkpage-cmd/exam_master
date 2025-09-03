@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart'; // اضافه شده
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -34,6 +34,16 @@ import 'screens/admin_dashboard.dart';
 import 'screens/moderator_dashboard.dart';
 import 'screens/instructor/instructor_dashboard.dart';
 import 'screens/instructor/create_class_page.dart';
+// مسیرهای صفحات جدید
+import 'screens/normal_user/propose_question_page.dart';
+import 'screens/normal_user/ticket_list_page.dart';
+import 'screens/normal_user/ticket_detail_page.dart';
+import 'screens/normal_user/create_ticket_page.dart';
+import 'screens/normal_user/request_capacity_page.dart';
+import 'screens/normal_user/my_proposals_page.dart'
+    as my_proposals; // اصلاح شده: استفاده از نام مستعار
+import 'screens/moderator/moderator_capacity_management.dart';
+// import 'screens/moderator/moderator_ticket_management.dart'; // اصلاح شده: حذف import
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,21 +88,17 @@ class ExamMasterApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-
           // تنظیمات localizations برای پشتیبانی از زبان فارسی
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-
           supportedLocales: const [
             Locale('fa', 'IR'), // فارسی
             Locale('en', 'US'), // انگلیسی
           ],
-
           locale: const Locale('fa', 'IR'), // زبان پیش‌فرض فارسی
-
           onUnknownRoute: (settings) {
             return MaterialPageRoute(
               builder: (context) => const Directionality(
@@ -105,9 +111,7 @@ class ExamMasterApp extends StatelessWidget {
               ),
             );
           },
-
           home: const WelcomeScreen(),
-
           routes: {
             // مسیرهای عمومی و کاربران
             '/test-questions': (_) => const QuestionManagementTestPage(),
@@ -117,16 +121,19 @@ class ExamMasterApp extends StatelessWidget {
             '/reset-password': (_) => ResetPasswordPage(),
             '/guest_home': (_) => const GuestHomePage(),
             '/quiz': (_) => const QuizPage(),
+
             // مسیرهای داشبوردها
             '/student_dashboard': (_) => const StudentDashboard(),
             '/instructor_dashboard': (_) => const InstructorDashboard(),
             '/normaluser_dashboard': (_) => const NormalUserDashboard(),
             '/moderator_dashboard': (_) => const ModeratorDashboard(),
             '/admin_dashboard': (_) => const AdminDashboard(),
+
             // مسیرهای مدیریت سوالات
             '/instructor_question_management': (_) =>
                 const QuestionManagementPage(),
             '/moderator_question_approval': (_) => const QuestionApprovalPage(),
+
             // مسیرهای مدیریتی
             '/admin_panel': (_) => const AdminPanelPage(),
             '/user-management': (_) => const UserManagementPage(),
@@ -134,9 +141,27 @@ class ExamMasterApp extends StatelessWidget {
             '/reports': (_) => const ReportsPage(),
             '/system-monitor': (_) => const SystemMonitorPage(),
             '/settings': (_) => const SettingsPage(),
+
             // مسیرهای استاد
             '/instructor_create_class': (_) => const CreateClassPage(),
             '/instructor_classes': (_) => const InstructorClassListPage(),
+
+            // === مسیرهای جدید برای کاربران عادی ===
+            '/propose_question': (_) => const ProposeQuestionPage(),
+            '/ticket_list': (_) => const TicketListPage(),
+            '/ticket_detail': (context) => TicketDetailPage(
+                  ticketId:
+                      ModalRoute.of(context)!.settings.arguments as String,
+                ),
+            '/create_ticket': (_) => const CreateTicketPage(),
+            '/request_capacity': (_) => const RequestCapacityPage(),
+            '/my_proposals': (_) => const my_proposals
+                .MyProposalsPage(), // اصلاح شده: استفاده از نام مستعار
+
+            // === مسیرهای جدید برای ناظرها ===
+            '/moderator_capacity_management': (_) =>
+                const ModeratorCapacityManagementPage(),
+            // '/moderator_ticket_management': (_) => const ModeratorTicketManagementPage(), // اصلاح شده: حذف مسیر
           },
         );
       },
@@ -199,7 +224,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         }
 
         return Scaffold(
-          // حذف Directionality از اینجا و اضافه به MaterialApp
           backgroundColor: AppTheme.backgroundColor,
           body: Center(
             child: SingleChildScrollView(
@@ -233,6 +257,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           ),
                     ),
                     const SizedBox(height: 32),
+
+                    // دکمه ورود با شماره موبایل
                     _buildButton(
                       key: const Key('mobile_login_button'),
                       icon: Icons.phone_android,
@@ -242,12 +268,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         MaterialPageRoute(builder: (_) => const OtpTestPage()),
                       ),
                     ),
+
+                    // دکمه ورود با ایمیل
                     _buildButton(
                       key: const Key('email_login_button'),
                       icon: Icons.email,
                       label: 'ورود با ایمیل / رمز عبور',
                       onPressed: () => Navigator.pushNamed(context, '/login'),
                     ),
+
+                    // دکمه ثبت‌نام
                     _buildButton(
                       key: const Key('register_button'),
                       icon: Icons.person_add_alt_1,
@@ -255,6 +285,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       onPressed: () =>
                           Navigator.pushNamed(context, '/register'),
                     ),
+
+                    // دکمه ورود مهمان
                     _buildButton(
                       key: const Key('guest_login_button'),
                       icon: Icons.person_outline,
@@ -266,7 +298,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         Navigator.pushNamed(context, '/guest_home');
                       },
                     ),
+
                     const SizedBox(height: 30),
+
+                    // دکمه شروع آزمون
                     ElevatedButton(
                       key: const Key('start_quiz_button'),
                       onPressed: () => Navigator.pushNamed(context, '/quiz'),
